@@ -1,5 +1,6 @@
 import requests
 import pandas as pd
+import streamlit as st
 from google.transit import gtfs_realtime_pb2
 
 # GTFS-RT URL (TransLink - Bus)
@@ -21,12 +22,12 @@ def get_realtime_data(route_id):
             vehicle = entity.vehicle
             if vehicle.trip.route_id == route_id:
                 vehicles.append({
-                    "trip_id": vehicle.trip.trip_id,
-                    "route_id": vehicle.trip.route_id,
-                    "vehicle_id": vehicle.vehicle.id,
-                    "lat": vehicle.position.latitude,
-                    "lon": vehicle.position.longitude,
-                    "speed": vehicle.position.speed if vehicle.position.HasField("speed") else None
+                    "Trip ID": vehicle.trip.trip_id,
+                    "Route ID": vehicle.trip.route_id,
+                    "Vehicle ID": vehicle.vehicle.id,
+                    "Latitude": vehicle.position.latitude,
+                    "Longitude": vehicle.position.longitude,
+                    "Speed (m/s)": vehicle.position.speed if vehicle.position.HasField("speed") else None
                 })
 
     if not vehicles:
@@ -34,10 +35,16 @@ def get_realtime_data(route_id):
 
     return pd.DataFrame(vehicles), None
 
-# Example usage
-route_id = "700"
+# Streamlit App
+st.title("Real-Time Bus Tracking - Route 700")
+
+route_id = "700"  # Fixed route for display
 df, error = get_realtime_data(route_id)
+
 if error:
-    print(error)
+    st.warning(error)
 else:
-    print(df)
+    st.write(f"### Live Vehicle Data for Route {route_id}")
+    st.dataframe(df)
+
+# Run the script with: `streamlit run script.py`
