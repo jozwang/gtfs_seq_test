@@ -48,11 +48,13 @@
 
 import requests
 from google.transit import gtfs_realtime_pb2
+import pandas as pd
+import streamlit as st
 
 # Define the GTFS-RT feed URL
 GTFS_RT_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/VehiclePositions/Bus"
 
-def fetch_and_list_vehicle_fields(url):
+def fetch_vehicle_fields(url):
     """Fetch GTFS-RT data and list all fields in feed.entity.vehicle."""
     try:
         response = requests.get(url)
@@ -61,15 +63,24 @@ def fetch_and_list_vehicle_fields(url):
         feed = gtfs_realtime_pb2.FeedMessage()
         feed.ParseFromString(response.content)
         
-        # Extract and print available fields in vehicle entity
+        # Extract fields for the first vehicle entity
         for entity in feed.entity:
             if entity.HasField("vehicle"):
                 vehicle = entity.vehicle
-                print("Available fields in vehicle entity:")
-                print(dir(vehicle))  # Lists all attributes of the vehicle object
-                break  # Print fields for the first entity and exit
+                fields = {field: getattr(vehicle, field, None) for field in dir(vehicle) if not field.startswith("_")}
+                return pd.DataFrame([fields])  # Convert to DataFrame for Streamlit
+        
+        return pd.DataFrame()
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching GTFS-RT feed: {e}")
+        st.error(f"Error fetching GTFS-RT feed: {e}")
+        return pd.DataFrame()
 
-if __name__ == "__main__":
-    fetch_and_list_vehicle_fields(GTFS_RT_URL)
+# Streamlit App
+st.title("GTFS Realtime Vehicle Fields")
+
+# Fetch data and display as table
+df = fetch_vehicle_fields(GTFS_RT_URL)
+if not df.empty:
+    st.dataframe(df)
+else:
+    st.write("No vehicle data available.")
