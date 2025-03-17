@@ -46,14 +46,6 @@
 #     st.write("No vehicle data available.")
 
 
-import requests
-from google.transit import gtfs_realtime_pb2
-import pandas as pd
-import streamlit as st
-
-# Define the GTFS-RT feed URL
-GTFS_RT_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/VehiclePositions/Bus"
-
 def fetch_vehicle_fields(url):
     """Fetch GTFS-RT data and list all fields in feed.entity.vehicle."""
     try:
@@ -67,7 +59,7 @@ def fetch_vehicle_fields(url):
         for entity in feed.entity:
             if entity.HasField("vehicle"):
                 vehicle = entity.vehicle
-                fields = {field: getattr(vehicle, field, None) for field in dir(vehicle) if not field.startswith("_")}
+                fields = {field: str(getattr(vehicle, field, None)) for field in dir(vehicle) if not field.startswith("_")}
                 return pd.DataFrame([fields])  # Convert to DataFrame for Streamlit
         
         return pd.DataFrame()
@@ -75,12 +67,3 @@ def fetch_vehicle_fields(url):
         st.error(f"Error fetching GTFS-RT feed: {e}")
         return pd.DataFrame()
 
-# Streamlit App
-st.title("GTFS Realtime Vehicle Fields")
-
-# Fetch data and display as table
-df = fetch_vehicle_fields(GTFS_RT_URL)
-if not df.empty:
-    st.dataframe(df)
-else:
-    st.write("No vehicle data available.")
