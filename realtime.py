@@ -20,8 +20,7 @@ def fetch_vehicle_fields(url):
         for entity in feed.entity:
             if entity.HasField("vehicle"):
                 vehicle = entity.vehicle
-                trip = entity.trip_update if entity.HasField("trip_update") else None
-                stop_time_update = trip.stop_time_update if trip and trip.stop_time_update else []
+                stop_time_update = vehicle.trip.stop_time_update if vehicle.trip and vehicle.trip.stop_time_update else []
                 
                 stop_time_str = ", ".join([f"Stop {stu.stop_sequence}: Arrival - {stu.arrival.time if stu.HasField('arrival') else 'N/A'}, Departure - {stu.departure.time if stu.HasField('departure') else 'N/A'}" for stu in stop_time_update]) if stop_time_update else "No Stop Updates"
                 
@@ -32,10 +31,10 @@ def fetch_vehicle_fields(url):
                     "Longitude": vehicle.position.longitude,
                     "Bearing": vehicle.position.bearing,
                     "Speed (m/s)": vehicle.position.speed,
-                    "Route ID": trip.route_id if trip and trip.HasField("route_id") else "Unknown",
-                    "Trip ID": trip.trip_id if trip and trip.HasField("trip_id") else "Unknown",
-                    "Trip start_time": trip.start_time if trip and trip.HasField("start_time") else "Unknown",
-                    "Trip Modifications": trip.schedule_relationship if trip and trip.HasField("schedule_relationship") else "Unknown",
+                    "Route ID": vehicle.trip.route_id if vehicle.HasField("trip") and vehicle.trip.HasField("route_id") else "Unknown",
+                    "Trip ID": vehicle.trip.trip_id if vehicle.HasField("trip") and vehicle.trip.HasField("trip_id") else "Unknown",
+                    "Trip start_time": vehicle.trip.start_time if vehicle.HasField("trip") and vehicle.trip.HasField("start_time") else "Unknown",
+                    "Trip Modifications": vehicle.trip.schedule_relationship if vehicle.HasField("trip") and vehicle.trip.HasField("schedule_relationship") else "Unknown",
                     "Stop Sequence": vehicle.current_stop_sequence if vehicle.HasField("current_stop_sequence") else "Unknown",
                     "Stop Time Update": stop_time_str,
                     "Occupancy Status": vehicle.occupancy_status if vehicle.HasField("occupancy_status") else "Unknown",
