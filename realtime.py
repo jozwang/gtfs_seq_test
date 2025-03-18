@@ -23,7 +23,7 @@ def fetch_vehicle_fields(url):
                 data.append({
                     "Vehicle ID": vehicle.vehicle.id,
                     "Label": vehicle.vehicle.label,
-                    "License plate ": vehicle.vehicle.License_plate ,
+                    # "License plate ": vehicle.vehicle.License_plate ,
                     "Latitude": vehicle.position.latitude,
                     "Longitude": vehicle.position.longitude,
                     "Bearing": vehicle.position.bearing,
