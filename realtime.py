@@ -20,19 +20,20 @@ def fetch_vehicle_fields(url):
         for entity in feed.entity:
             if entity.HasField("vehicle"):
                 vehicle = entity.vehicle
+                trip = vehicle.trip
                 data.append({
                     "Vehicle ID": vehicle.vehicle.id,
                     "Label": vehicle.vehicle.label,
-                    # "License plate ": vehicle.vehicle.License_plate ,
                     "Latitude": vehicle.position.latitude,
                     "Longitude": vehicle.position.longitude,
                     "Bearing": vehicle.position.bearing,
                     "Speed (m/s)": vehicle.position.speed,
-                    "Route ID": vehicle.trip.route_id,
-                    "Trip ID": vehicle.trip.trip_id,
-                    # "Occupancy Status": vehicle.occupancy_status if vehicle.HasField("occupancy_status") else "Unknown",
-                    # "Congestion Level": vehicle.Congestion_level if vehicle.HasField("congestion_level") else "Unknown",
-                    # "Stopped at": vehicle.VehicleStopStatus.Stopped_at if vehicle.HasField("vehicle_stop_status") else "Unknown",
+                    "Route ID": trip.route_id,
+                    "Trip ID": trip.trip_id,
+                    "Trip Descriptor": trip.start_time if trip.HasField("start_time") else "Unknown",
+                    "Trip Modifications": trip.schedule_relationship if trip.HasField("schedule_relationship") else "Unknown",
+                    "Stop Sequence": vehicle.current_stop_sequence if vehicle.HasField("current_stop_sequence") else "Unknown",
+                    "Occupancy Status": vehicle.occupancy_status if vehicle.HasField("occupancy_status") else "Unknown",
                     "Timestamp": vehicle.timestamp if vehicle.HasField("timestamp") else "Unknown"
                 })
         
