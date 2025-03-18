@@ -23,13 +23,16 @@ def fetch_vehicle_fields(url):
                 data.append({
                     "Vehicle ID": vehicle.vehicle.id,
                     "Label": vehicle.vehicle.label,
+                    "License plate ": vehicle.vehicle.License_plate ,
                     "Latitude": vehicle.position.latitude,
                     "Longitude": vehicle.position.longitude,
                     "Bearing": vehicle.position.bearing,
                     "Speed (m/s)": vehicle.position.speed,
                     "Route ID": vehicle.trip.route_id,
                     "Trip ID": vehicle.trip.trip_id,
-                    "Occupancy Status": vehicle.occupancy_status if vehicle.HasField("occupancy_status") else "Unknown",
+                    "Occupancy Status": vehicle.occupancystatus if vehicle.HasField("occupancystatus") else "Unknown",
+                    "Congestion Level": vehicle.CongestionLevel if vehicle.HasField("CongestionLevel") else "Unknown",
+                    "Stopped at": vehicle.VehicleStopStatus.Stopped_at if vehicle.HasField("VehicleStopStatus") else "Unknown",
                     "Timestamp": vehicle.timestamp if vehicle.HasField("timestamp") else "Unknown"
                 })
         
