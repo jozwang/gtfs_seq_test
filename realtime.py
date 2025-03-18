@@ -30,8 +30,8 @@ def fetch_vehicle_fields(url):
                     "Speed (m/s)": vehicle.position.speed,
                     "Route ID": vehicle.trip.route_id,
                     "Trip ID": vehicle.trip.trip_id,
-                    # "Occupancy Status": vehicle.occupancystatus if vehicle.HasField("occupancystatus") else "Unknown",
-                    "Congestion Level": vehicle.CongestionLevel if vehicle.HasField("CongestionLevel") else "Unknown",
+                    # "Occupancy Status": vehicle.occupancy_status if vehicle.HasField("occupancy_status") else "Unknown",
+                    "Congestion Level": vehicle.Congestion_level if vehicle.HasField("Congestion_level") else "Unknown",
                     "Stopped at": vehicle.VehicleStopStatus.Stopped_at if vehicle.HasField("VehicleStopStatus") else "Unknown",
                     "Timestamp": vehicle.timestamp if vehicle.HasField("timestamp") else "Unknown"
                 })
