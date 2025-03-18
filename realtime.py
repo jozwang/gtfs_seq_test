@@ -20,6 +20,7 @@ def fetch_vehicle_fields(url):
         for entity in feed.entity:
             if entity.HasField("vehicle"):
                 vehicle = entity.vehicle
+                trip = entity.trip_update if entity.HasField("trip_update") else None
                 stop_time_update = trip.stop_time_update if trip and trip.stop_time_update else []
                 
                 stop_time_str = ", ".join([f"Stop {stu.stop_sequence}: Arrival - {stu.arrival.time if stu.HasField('arrival') else 'N/A'}, Departure - {stu.departure.time if stu.HasField('departure') else 'N/A'}" for stu in stop_time_update]) if stop_time_update else "No Stop Updates"
