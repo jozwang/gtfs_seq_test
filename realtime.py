@@ -32,7 +32,7 @@ def fetch_vehicle_fields(url):
                     "Route ID": vehicle.trip.route_id,
                     "Trip ID": vehicle.trip.trip_id,
                     "Trip start_time": trip.start_time if trip.HasField("start_time") else "Unknown",
-                    "Delay": stop.arrival.delay if trip.HasField("arrival") else "Unknown",
+                    "Delay": stop.arrival.delay if trip.HasField("arrival.delay") else "Unknown",
                     "Stop Sequence": vehicle.current_stop_sequence if vehicle.HasField("current_stop_sequence") else "Unknown",
                     "Occupancy Status": vehicle.occupancy_status if vehicle.HasField("occupancy_status") else "Unknown",
                     "Timestamp": vehicle.timestamp if vehicle.HasField("timestamp") else "Unknown"
