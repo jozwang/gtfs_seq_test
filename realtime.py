@@ -29,7 +29,7 @@ def fetch_vehicle_fields(url):
                     "Bearing": vehicle.position.bearing,
                     "Speed (m/s)": vehicle.position.speed,
                     "Route ID": vehicle.trip.route_id,
-                    "Trip ID": trip.trip_id,
+                    "Trip ID": vehicle.trip.trip_id,
                     "Trip start_time": trip.start_time if trip.HasField("start_time") else "Unknown",
                     "Trip Modifications": trip.schedule_relationship if trip.HasField("schedule_relationship") else "Unknown",
                     "Stop Sequence": vehicle.current_stop_sequence if vehicle.HasField("current_stop_sequence") else "Unknown",
