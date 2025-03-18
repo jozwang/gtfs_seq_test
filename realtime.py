@@ -21,7 +21,7 @@ def fetch_vehicle_fields(url):
             if entity.HasField("vehicle"):
                 vehicle = entity.vehicle
                 trip = entity.trip_update.trip
-                stop=entity.stop_time_update
+                stop=entity.trip_update.stop_time_update
                 data.append({
                     "Vehicle ID": vehicle.vehicle.id,
                     "Label": vehicle.vehicle.label,
