@@ -147,7 +147,7 @@ if not display_df.empty:
     col1, col2 = st.columns([8, 2])
     with col1:
         st.write("### Vehicle Map")
-        m = folium.Map(location=[display_df["lat"].mean(), display_df["lon"].mean()], zoom_start=12, tiles="cartodb positro, width=st.columns([1, 8, 1])[1].width, height=500)
+        m = folium.Map(location=[display_df["lat"].mean(), display_df["lon"].mean()], zoom_start=12, tiles="cartodb positron", width=st.columns([1, 8, 1])[1].width, height=500)
         
         for _, row in display_df.iterrows():
             color = "green" if row["status"] == "On Time" else "yellow" if row["status"] == "Delayed" else "red"
