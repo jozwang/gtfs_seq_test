@@ -152,26 +152,34 @@ if not display_df.empty:
         #     map_width = st.get_option("server.maxUploadSize")  # Set width to fit the layout
         m = folium.Map(location=[display_df["lat"].mean(), display_df["lon"].mean()], zoom_start=12, tiles="cartodb positron")
     
+        # for _, row in display_df.iterrows():
+        #     # Set marker color based on stop status
+        #     if row["status"] == "On Time":
+        #         color = "green"
+        #     elif row["status"] == "Delayed":
+        #         color = "yellow"
+        #     else:
+        #         color = "red"
+            
+        #     marker = folium.Marker(
+        #         location=[row["lat"], row["lon"]],
+        #         popup=f"Vehicle ID: {row['vehicle_id']}",
+        #         icon=folium.Icon(color=color)
+        #     ).add_to(m)
+            
+        #     folium.Marker(
+        #         location=[row["lat"], row["lon"]],
+        #         icon=folium.DivIcon(html=f'<div style="font-size: 12px; font-weight: bold; color: black; background-color: white; padding: 2px; border-radius: 3px;">{row["vehicle_id"]}</div>')
+        #     ).add_to(m)
         for _, row in display_df.iterrows():
-            # Set marker color based on stop status
-            if row["status"] == "On Time":
-                color = "green"
-            elif row["status"] == "Delayed":
-                color = "yellow"
-            else:
-                color = "red"
-            
-            marker = folium.Marker(
-                location=[row["lat"], row["lon"]],
-                popup=f"Vehicle ID: {row['vehicle_id']}",
-                icon=folium.Icon(color=color)
-            ).add_to(m)
-            
+            color = "green" if row["status"] == "On Time" else "yellow" if row["status"] == "Delayed" else "red"
             folium.Marker(
                 location=[row["lat"], row["lon"]],
-                icon=folium.DivIcon(html=f'<div style="font-size: 12px; font-weight: bold; color: black; background-color: white; padding: 2px; border-radius: 3px;">{row["vehicle_id"]}</div>')
+                icon=folium.DivIcon(html=f'<div style="font-size: 12px; font-weight: bold; color: black; background-color: white; padding: 2px; border-radius: 3px;">{row["vehicle_id"]} - {row["Stop Sequence"]}</div>')
+                location=[row["lat"], row["lon"]],
+                popup=f"Vehicle ID: {row['vehicle_id']}<br>Stop Sequence: {row['Stop Sequence']}",
+                icon=folium.Icon(color=color)
             ).add_to(m)
-    
         folium_static(m)
 
     with col2:
