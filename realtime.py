@@ -151,15 +151,20 @@ if not display_df.empty:
         
         for _, row in display_df.iterrows():
             color = "green" if row["status"] == "On Time" else "yellow" if row["status"] == "Delayed" else "red"
-            folium.Marker(
-                location=[row["lat"], row["lon"]],
-                popup=f"Vehicle ID: {row['vehicle_id']}<br>Stop Sequence: {row['Stop Sequence']}",
-                icon=folium.Icon(color=color)
-            ).add_to(m)
 
+            folium.CircleMarker(
+                location=[row["lat"], row["lon"]],
+                radius=8,
+                color="black",
+                fill=True,
+                fill_color=color,
+                fill_opacity=0.9,
+                popup=f"Vehicle ID: {row['vehicle_id']}<br>Stop Sequence: {row['Stop Sequence']}"
+            ).add_to(m)
+            
             folium.Marker(
                 location=[row["lat"], row["lon"]],
-                icon=folium.DivIcon(html=f'<div style="font-size: 12px; font-weight: bold; color: black; background-color: white; padding: 4px; border-radius: 3px;">{f"veh-{row['vehicle_id']}"} - {f"stop-{row['Stop Sequence']}"}</div>')
+                icon=folium.DivIcon(html=f'<div style="font-size: 12px; font-weight: bold; color: black; background-color: white; padding: 4px; border-radius: 3px;"> {f"stop-{row['Stop Sequence']}"}</div>')
             ).add_to(m)
         
         folium_static(m)
