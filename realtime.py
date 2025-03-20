@@ -174,7 +174,7 @@ if not display_df.empty:
             
             folium.Marker(
                 location=[row["lat"] - 0.0002, row["lon"]],
-                icon=folium.DivIcon(html=f'<div style="font-size: 12px; font-weight: bold; color: black; background-color: white; padding: 2px; border-radius: 6px;"> {f"stop-{row['Stop Sequence']}"}</div>')
+                icon=folium.DivIcon(html=f'<div style="font-size: 12px; font-weight: bold; color: black; padding: 2px; border-radius: 6px;"> {f"At stop-{row['Stop Sequence']}"}</div>')
             ).add_to(m)
         
         folium_static(m)
