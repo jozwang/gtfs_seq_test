@@ -182,8 +182,10 @@ if not display_df.empty:
 # Detect browser timezone (defaulting to Australia/Brisbane if unknown)
 def get_browser_timezone():
     try:
-        return pytz.timezone(st.experimental_user.get("timezone", "Australia/Brisbane"))
-    except:
+        import tzlocal
+        local_timezone = tzlocal.get_localzone()
+        return pytz.timezone(str(local_timezone))
+    except Exception:
         return pytz.timezone("Australia/Brisbane")
 browser_timezone =get_browser_timezone() 
 # pytz.timezone("Australia/Brisbane")
