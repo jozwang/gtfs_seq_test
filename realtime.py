@@ -141,13 +141,44 @@ def get_vehicle_updates():
 st.set_page_config(layout="wide")
 st.title("GTFS Realtime Vehicle Fields")
 
-# Fetch data and display as table
-# df = fetch_vehicle_fields(GTFS_RT_URL)
-df=get_vehicle_updates()
-if not df.empty:
-    st.dataframe(df)
+# Fetch vehicle data
+df = get_vehicle_updates()
+
+# Sidebar filters
+st.sidebar.title("🚍 Select Filters")
+
+# Default selections
+default_region = "Gold Coast"
+default_route = "777"
+
+# Region selection
+region_options = sorted(df["region"].unique())
+selected_region = st.sidebar.selectbox("Select a Region", region_options, index=region_options.index(default_region) if default_region in region_options else 0)
+
+# Filter routes based on selected region
+filtered_df = df[df["region"] == selected_region]
+route_options = sorted(filtered_df["route_name"].unique())
+selected_route = st.sidebar.selectbox("Select a Route", route_options, index=route_options.index(default_route) if default_route in route_options else 0)
+
+# Apply filters
+display_df = filtered_df[filtered_df["route_name"] == selected_route]
+
+# Display filtered data
+if not display_df.empty:
+    st.dataframe(display_df)
 else:
     st.write("No vehicle data available.")
+        
+# st.set_page_config(layout="wide")
+# st.title("GTFS Realtime Vehicle Fields")
+
+# # Fetch data and display as table
+# # df = fetch_vehicle_fields(GTFS_RT_URL)
+# df=get_vehicle_updates() 
+# if not df.empty:
+#     st.dataframe(df)
+# else:
+#     st.write("No vehicle data available.")
 
 
 # id: "VU-9F10C7088E8F64E70D53AB5059107979_1"
