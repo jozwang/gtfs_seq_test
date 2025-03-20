@@ -136,12 +136,24 @@ display_df = filtered_df[filtered_df["route_name"] == st.session_state.selected_
 if st.sidebar.button("🔄 Refresh Data"):
     st.rerun()
 
-# Display filtered data
-if not display_df.empty:
-    st.dataframe(display_df)
-else:
-    st.write("No vehicle data available.")
+# # Display filtered data
+# if not display_df.empty:
+#     st.dataframe(display_df)
+# else:
+#     st.write("No vehicle data available.")
 
+# Colorize Table Rows to Match Map Markers
+def colorize_row(row):
+    color = "background-color: green;" if row["status"] == "On Time" else \
+            "background-color: yellow;" if row["status"] == "Delayed" else \
+            "background-color: red;"
+    return [color] * len(row)
+
+if not display_df.empty:
+    styled_df = display_df.style.apply(colorize_row, axis=1)
+    st.write("### Vehicle Data Table")
+    st.dataframe(styled_df)
+    
 # Display map if there are filtered results
 if not display_df.empty:
     col1, col2 = st.columns([8, 2])
