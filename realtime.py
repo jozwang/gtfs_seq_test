@@ -1,7 +1,3 @@
-# import requests
-# from google.transit import gtfs_realtime_pb2
-# import pandas as pd
-
 
 import streamlit as st
 import folium
@@ -9,7 +5,8 @@ from streamlit_folium import folium_static
 import requests
 import pandas as pd
 from google.transit import gtfs_realtime_pb2
-from datetime import datetime
+from datetime import datetime, timedelta
+import time
 
 def fetch_gtfs_rt(url):
     """Fetch GTFS-RT data from a given URL."""
