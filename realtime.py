@@ -175,7 +175,7 @@ if not display_df.empty:
 
             folium.Marker(
             location=[row["lat"], row["lon"]],
-            icon=folium.Icon(icon="bus", prefix="fa", color=white),
+            icon=folium.Icon(icon="bus", prefix="fa"),
             color=color
            ).add_to(m)
             
