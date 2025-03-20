@@ -109,7 +109,7 @@ def get_trip_updates():
     return pd.DataFrame(updates)
 
 def get_vehicle_updates():
-    """Merge real-time vehicle positions with trip updates on trip_id and route_id."""
+    """Merge real-time vehicle positions with trip updates, add route_name, and categorize by lat/lon."""
     vehicles_df = get_realtime_vehicles()
     updates_df = get_trip_updates()
     
@@ -120,7 +120,20 @@ def get_vehicle_updates():
     
     veh_update = vehicles_df.merge(updates_df, on=["trip_id", "route_id"], how="left")
     veh_update["route_name"] = veh_update["route_id"].str.split("-").str[0]
+    
+    # Categorize by lat/lon
+    def categorize_region(lat, lon):
+        if -27.75 <= lat <= -27.0 and 152.75 <= lon <= 153.5:
+            return "Brisbane"
+        elif -28.2 <= lat <= -27.8 and 153.3 <= lon <= 153.6:
+            return "Gold Coast"
+        else:
+            return "Other"
+    
+    veh_update["region"] = veh_update.apply(lambda row: categorize_region(row["lat"], row["lon"]), axis=1)
+    
     return veh_update
+
 
 # Streamlit App
 st.set_page_config(layout="wide")
