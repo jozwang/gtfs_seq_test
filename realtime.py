@@ -103,7 +103,7 @@ def get_trip_updates():
                 "trip_id": trip_update.trip.trip_id,
                 "route_id": trip_update.trip.route_id,
                 "delay": delay,
-                "status": "Delayed" if delay and delay > 300 else "On Time"
+                "status": "Delayed" if delay and delay > 300 else ("Early" if delay and delay < -60 else "On Time")
             })
     
     return pd.DataFrame(updates)
