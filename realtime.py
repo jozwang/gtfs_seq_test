@@ -42,7 +42,7 @@ def get_realtime_vehicles():
                 "Stop Sequence": vehicle.current_stop_sequence ,
                 "Stop ID": vehicle.stop_id ,
                 "current_status": vehicle.current_status ,
-                "Timestamp": vehicle.timestamp if vehicle.HasField("timestamp") else "Unknown"
+                "Timestamp": datetime.fromtimestamp(vehicle.timestamp, pytz.timezone('Australia/Brisbane')).strftime('%Y-%m-%d %H:%M:%S %Z') if vehicle.HasField("timestamp") else "Unknown"
             })
     
     return pd.DataFrame(vehicles)
