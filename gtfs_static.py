@@ -129,6 +129,18 @@ def plot_route_on_map(route_shapes, route_stops, route_color):
         tooltip=True
     )
 
+  # Text Layer for Stop Sequence Numbers
+    text_layer = pdk.Layer(
+        "TextLayer",
+        data=route_stops,
+        get_position=["stop_lon", "stop_lat"],
+        get_text="stop_sequence",
+        get_size=16,
+        get_color=[255, 255, 255],  # White text for contrast
+        get_angle=0,
+        get_alignment_baseline="center",
+        pickable=False
+    )
     view_state = pdk.ViewState(
         latitude=route_shapes["shape_pt_lat"].mean(),
         longitude=route_shapes["shape_pt_lon"].mean(),
@@ -137,7 +149,7 @@ def plot_route_on_map(route_shapes, route_stops, route_color):
     )
 
     st.pydeck_chart(pdk.Deck(
-        layers=[line_layer, stop_layer],
+        layers=[line_layer, stop_layer, text_layer],
         initial_view_state=view_state,
         tooltip={"text": "{stop_name}"}
     ))
