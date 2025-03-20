@@ -80,14 +80,26 @@ def get_route_shapes(route_id, direction, trips_df, shapes_df):
     # Sort by shape_id and sequence
     route_shapes = route_shapes.sort_values(by=["shape_id", "shape_pt_sequence"])
 
-    # Create start-end coordinate pairs for LineLayer
-    route_shapes["next_lat"] = route_shapes["shape_pt_lat"].shift(-1)
-    route_shapes["next_lon"] = route_shapes["shape_pt_lon"].shift(-1)
+    # Process each shape_id separately to create line segments
+    line_segments = []
     
-    # Remove last row of each shape (no next point to connect)
-    route_shapes = route_shapes.dropna(subset=["next_lat", "next_lon"])
-
-    return route_shapes
+    for shape_id in shape_ids:
+        shape_points = route_shapes[route_shapes["shape_id"] == shape_id].copy()
+        
+        # Create start-end coordinate pairs for LineLayer
+        shape_points["next_lat"] = shape_points["shape_pt_lat"].shift(-1)
+        shape_points["next_lon"] = shape_points["shape_pt_lon"].shift(-1)
+        
+        # Remove last row (no next point to connect)
+        shape_points = shape_points.dropna(subset=["next_lat", "next_lon"])
+        
+        line_segments.append(shape_points)
+    
+    if not line_segments:
+        return pd.DataFrame()
+        
+    # Combine all line segments
+    return pd.concat(line_segments, ignore_index=True)
 
 def get_route_stops(route_id, direction, trips_df, stop_times_df, stops_df):
     """Retrieve stops for a given route ID and direction."""
@@ -129,7 +141,7 @@ def plot_route_on_map(route_shapes, route_stops, route_color):
         tooltip=True
     )
 
-  # Text Layer for Stop Sequence Numbers
+    # Text Layer for Stop Sequence Numbers
     text_layer = pdk.Layer(
         "TextLayer",
         data=route_stops,
@@ -141,6 +153,7 @@ def plot_route_on_map(route_shapes, route_stops, route_color):
         get_alignment_baseline="center",
         pickable=False
     )
+    
     view_state = pdk.ViewState(
         latitude=route_shapes["shape_pt_lat"].mean(),
         longitude=route_shapes["shape_pt_lon"].mean(),
