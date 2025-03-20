@@ -154,12 +154,16 @@ if not display_df.empty:
 
             folium.CircleMarker(
                 location=[row["lat"], row["lon"]],
-                radius=8,
-                color="black",
+                radius=10,
+                color=color,
                 fill=True,
                 fill_color=color,
                 fill_opacity=0.9,
-                popup=f"Vehicle ID: {row['vehicle_id']}<br>Stop Sequence: {row['Stop Sequence']}"
+            ).add_to(m)
+            
+            folium.Marker(
+                location=[row["lat"], row["lon"]],
+                icon=folium.DivIcon(html=f'<div style="font-size: 14px; font-weight: bold; color: white; text-align: center;">veh-{row["vehicle_id"]}</div>')
             ).add_to(m)
             
             folium.Marker(
