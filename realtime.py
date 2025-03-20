@@ -7,6 +7,7 @@ import pandas as pd
 from google.transit import gtfs_realtime_pb2
 from datetime import datetime, timedelta
 import time
+import pytz
 
 def fetch_gtfs_rt(url):
     """Fetch GTFS-RT data from a given URL."""
@@ -177,6 +178,13 @@ if not display_df.empty:
         st.write("### Refresh Info")
         st.write(f"🕒 Last Refreshed: {st.session_state.get('last_refreshed', 'N/A')}")
         st.write(f"⏳ Next Refresh: {st.session_state.get('next_refresh', 'N/A')}")
+
+# Detect browser timezone (defaulting to Australia/Brisbane if unknown)
+def get_browser_timezone():
+    try:
+        return pytz.timezone(st.experimental_user.get("timezone", "Australia/Brisbane"))
+    except:
+        return pytz.timezone("Australia/Brisbane")
 browser_timezone = pytz.timezone("Australia/Brisbane")
 
 # Auto-refresh
