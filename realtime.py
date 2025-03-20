@@ -177,17 +177,15 @@ if not display_df.empty:
         st.write("### Refresh Info")
         st.write(f"🕒 Last Refreshed: {st.session_state.get('last_refreshed', 'N/A')}")
         st.write(f"⏳ Next Refresh: {st.session_state.get('next_refresh', 'N/A')}")
+browser_timezone = pytz.timezone("Australia/Brisbane")
 
-# Add auto-refresh checkbox
-import time
-
+# Auto-refresh
 auto_refresh = st.sidebar.checkbox("Auto-refresh every 30 seconds")
 if auto_refresh:
     time.sleep(30)
+    st.session_state["next_refresh"] = (datetime.now(pytz.utc) + timedelta(seconds=30)).astimezone(browser_timezone).strftime("%Y-%m-%d %H:%M:%S %Z")
     st.rerun()
-if auto_refresh:
-    st.empty()
-    st.rerun()
+
 
 # st.set_page_config(layout="wide")
 # st.title("GTFS Realtime Vehicle Fields")
