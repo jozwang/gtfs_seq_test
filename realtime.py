@@ -127,6 +127,8 @@ def get_vehicle_updates():
             return "Brisbane"
         elif -28.2 <= lat <= -27.8 and 153.3 <= lon <= 153.6:
             return "Gold Coast"
+        elif -26.9 <= lat <= -26.3 and 152.8 <= lon <= 153.2:
+            return "Sunshine Coast"
         else:
             return "Other"
     
