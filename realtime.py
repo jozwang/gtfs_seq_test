@@ -42,6 +42,8 @@
 #         st.error(f"Error fetching GTFS-RT feed: {e}")
 #         return pd.DataFrame()
 import streamlit as st
+import folium
+from streamlit_folium import folium_static
 import requests
 import pandas as pd
 from google.transit import gtfs_realtime_pb2
@@ -168,6 +170,27 @@ if not display_df.empty:
     st.dataframe(display_df)
 else:
     st.write("No vehicle data available.")
+        
+# Display map if there are filtered results
+if not display_df.empty:
+    m = folium.Map(location=[display_df["lat"].mean(), display_df["lon"].mean()], zoom_start=12)
+    
+    for _, row in display_df.iterrows():
+        # Set marker color based on stop status
+        if row["status"] == "On Time":
+            color = "green"
+        elif row["status"] == "Delayed":
+            color = "yellow"
+        else:
+            color = "red"
+        
+        folium.Marker(
+            location=[row["lat"], row["lon"]],
+            popup=f"Vehicle ID: {row['vehicle_id']}",
+            icon=folium.Icon(color=color)
+        ).add_to(m)
+    
+    folium_static(m)
         
 # st.set_page_config(layout="wide")
 # st.title("GTFS Realtime Vehicle Fields")
