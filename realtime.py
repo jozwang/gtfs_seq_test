@@ -3,44 +3,6 @@
 # import pandas as pd
 
 
-# # Define the GTFS-RT feed URL
-# GTFS_RT_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/VehiclePositions/Bus"
-
-# def fetch_vehicle_fields(url):
-#     """Fetch GTFS-RT data and list all fields in feed.entity.vehicle."""
-#     try:
-#         response = requests.get(url)
-#         response.raise_for_status()  # Ensure request was successful
-        
-#         feed = gtfs_realtime_pb2.FeedMessage()
-#         feed.ParseFromString(response.content)
-        
-#         # Extract fields for the first vehicle entity
-#         data = []
-#         for entity in feed.entity:
-#             if entity.HasField("vehicle"):
-#                 vehicle = entity.vehicle
-#                 trip = vehicle.trip
-#                 position = vehicle.position                
-
-
-#                 data.append({
-#                     "Vehicle ID": vehicle.vehicle.id,
-#                     "Label": vehicle.vehicle.label,
-#                     "Latitude": vehicle.position.latitude,
-#                     "Longitude": vehicle.position.longitude,
-#                     "Route ID": trip.route_id ,
-#                     "Trip ID": trip.trip_id ,
-#                     "Stop Sequence": vehicle.current_stop_sequence ,
-#                     "Stop ID": vehicle.stop_id ,
-#                     "current_status": vehicle.current_status ,
-#                     "Timestamp": vehicle.timestamp if vehicle.HasField("timestamp") else "Unknown"
-#                 })
-        
-#         return pd.DataFrame(data)
-#     except requests.exceptions.RequestException as e:
-#         st.error(f"Error fetching GTFS-RT feed: {e}")
-#         return pd.DataFrame()
 import streamlit as st
 import folium
 from streamlit_folium import folium_static
@@ -143,34 +105,40 @@ def get_vehicle_updates():
 st.set_page_config(layout="wide")
 st.title("GTFS Realtime Vehicle Fields")
 
+# Cache the last selection
+if "selected_region" not in st.session_state:
+    st.session_state.selected_region = "Gold Coast"
+if "selected_route" not in st.session_state:
+    st.session_state.selected_route = "777"
+
 # Fetch vehicle data
 df = get_vehicle_updates()
 
 # Sidebar filters
 st.sidebar.title("🚍 Select Filters")
 
-# Default selections
-default_region = "Gold Coast"
-default_route = "777"
-
 # Region selection
 region_options = sorted(df["region"].unique())
-selected_region = st.sidebar.selectbox("Select a Region", region_options, index=region_options.index(default_region) if default_region in region_options else 0)
+st.session_state.selected_region = st.sidebar.selectbox("Select a Region", region_options, index=region_options.index(st.session_state.selected_region) if st.session_state.selected_region in region_options else 0)
 
 # Filter routes based on selected region
-filtered_df = df[df["region"] == selected_region]
+filtered_df = df[df["region"] == st.session_state.selected_region]
 route_options = sorted(filtered_df["route_name"].unique())
-selected_route = st.sidebar.selectbox("Select a Route", route_options, index=route_options.index(default_route) if default_route in route_options else 0)
+st.session_state.selected_route = st.sidebar.selectbox("Select a Route", route_options, index=route_options.index(st.session_state.selected_route) if st.session_state.selected_route in route_options else 0)
 
 # Apply filters
-display_df = filtered_df[filtered_df["route_name"] == selected_route]
+display_df = filtered_df[filtered_df["route_name"] == st.session_state.selected_route]
+
+# Refresh button
+if st.sidebar.button("🔄 Refresh Data"):
+    st.experimental_rerun()
 
 # Display filtered data
 if not display_df.empty:
     st.dataframe(display_df)
 else:
     st.write("No vehicle data available.")
-        
+
 # Display map if there are filtered results
 if not display_df.empty:
     m = folium.Map(location=[display_df["lat"].mean(), display_df["lon"].mean()], zoom_start=12)
@@ -191,12 +159,6 @@ if not display_df.empty:
         ).add_to(m)
     
     folium_static(m)
-
-# Add refresh button
-refresh = st.sidebar.button("🔄 Refresh Data")
-
-# Add auto-refresh checkbox
-auto_refresh = st.sidebar.checkbox("Auto-refresh every 30 seconds")
 
 # Add simple auto-refresh
 if auto_refresh:
