@@ -167,7 +167,7 @@ if not display_df.empty:
                 icon=folium.DivIcon(html=f'<div style="font-size: 12px; font-weight: bold; color: black; background-color: white; padding: 2px; border-radius: 3px;">{row["vehicle_id"]}</div>')
             ).add_to(m)
     
-        folium_static(m, width=1400, height=500)
+        folium_static(m)
 
 
 # Add auto-refresh checkbox
