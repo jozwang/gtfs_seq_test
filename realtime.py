@@ -185,7 +185,8 @@ def get_browser_timezone():
         return pytz.timezone(st.experimental_user.get("timezone", "Australia/Brisbane"))
     except:
         return pytz.timezone("Australia/Brisbane")
-browser_timezone = pytz.timezone("Australia/Brisbane")
+browser_timezone =get_browser_timezone() 
+# pytz.timezone("Australia/Brisbane")
 
 # Auto-refresh
 auto_refresh = st.sidebar.checkbox("Auto-refresh every 30 seconds")
