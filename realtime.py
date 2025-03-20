@@ -122,6 +122,7 @@ def get_vehicle_updates():
     return veh_update
 
 # Streamlit App
+st.set_page_config(layout="wide")
 st.title("GTFS Realtime Vehicle Fields")
 
 # Fetch data and display as table
