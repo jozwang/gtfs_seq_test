@@ -145,7 +145,7 @@ if not display_df.empty:
     # map_container = st.container()
     # with map_container:
     #     map_width = st.get_option("server.maxUploadSize")  # Set width to fit the layout
-    m = folium.Map(location=[display_df["lat"].mean(), display_df["lon"].mean()], zoom_start=10, width=st.columns([1, 8, 1])[1].width, height=900, tiles="cartodb positron")
+    m = folium.Map(location=[display_df["lat"].mean(), display_df["lon"].mean()], zoom_start=10, tiles="cartodb positron")
 
     for _, row in display_df.iterrows():
         # Set marker color based on stop status
