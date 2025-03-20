@@ -142,6 +142,12 @@ def plot_route_on_map(route_shapes, route_stops, route_color):
         tooltip={"text": "{stop_name}"}
     ))
 
+def generate_unique_color(route_id):
+    """Generate a unique color based on route ID."""
+    hash_code = hash(route_id) % 256
+    return [hash_code, (hash_code * 3) % 256, (hash_code * 7) % 256]
+
+
 # Streamlit App
 st.title("Public Transport Route Visualisation")
 
