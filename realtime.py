@@ -108,9 +108,14 @@ if "selected_region" not in st.session_state:
 if "selected_route" not in st.session_state:
     st.session_state.selected_route = "777"
 if "last_refreshed" not in st.session_state:
-    st.session_state["last_refreshed"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    import pytz
+
+# Detect browser timezone and convert last refreshed time
+browser_timezone = pytz.timezone("Australia/Brisbane")  # Default to Brisbane, can be dynamic
+st.session_state["last_refreshed"] = datetime.now(pytz.utc).astimezone(browser_timezone).strftime("%Y-%m-%d %H:%M:%S %Z")
 if "next_refresh" not in st.session_state:
-    st.session_state["next_refresh"] = (datetime.now() + timedelta(seconds=30)).strftime("%Y-%m-%d %H:%M:%S")
+    st.session_state["next_refresh"] = "N/A"
+
 # Fetch vehicle data
 df = get_vehicle_updates()
 
