@@ -66,6 +66,40 @@ def get_routes_for_region(region, stops_df, trips_df, routes_df):
     
     return routes_df[routes_df["route_id"].isin(route_ids_in_region)]
 
+def get_route_shapes(route_id, direction, trips_df, shapes_df):
+    """Retrieve and structure shape points for a given route ID and direction."""
+    trip_shapes = trips_df[(trips_df["route_id"] == route_id) & (trips_df["direction_id"] == str(direction))][["shape_id"]].drop_duplicates()
+    shape_ids = trip_shapes["shape_id"].unique()
+
+    if len(shape_ids) == 0:
+        return pd.DataFrame()
+
+    route_shapes = shapes_df[shapes_df["shape_id"].isin(shape_ids)]
+    route_shapes = route_shapes.astype({"shape_pt_lat": "float", "shape_pt_lon": "float", "shape_pt_sequence": "int"})
+
+    # Sort by shape_id and sequence
+    route_shapes = route_shapes.sort_values(by=["shape_id", "shape_pt_sequence"])
+
+    # Create start-end coordinate pairs for LineLayer
+    route_shapes["next_lat"] = route_shapes["shape_pt_lat"].shift(-1)
+    route_shapes["next_lon"] = route_shapes["shape_pt_lon"].shift(-1)
+    
+    # Remove last row of each shape (no next point to connect)
+    route_shapes = route_shapes.dropna(subset=["next_lat", "next_lon"])
+
+    return route_shapes
+
+def get_route_stops(route_id, direction, trips_df, stop_times_df, stops_df):
+    """Retrieve stops for a given route ID and direction."""
+    trip_ids = trips_df[(trips_df["route_id"] == route_id) & (trips_df["direction_id"] == str(direction))]["trip_id"].unique()
+    stops_in_route = stop_times_df[stop_times_df["trip_id"].isin(trip_ids)]
+    
+    # Merge with stops data
+    stops_in_route = stops_in_route.merge(stops_df, on="stop_id", how="left")
+    stops_in_route = stops_in_route.astype({"stop_lat": "float", "stop_lon": "float"})
+
+    return stops_in_route.drop_duplicates(subset=["stop_id"])
+
 def plot_route_on_map(route_shapes, route_stops, route_color):
     """Plot route path and stops on a map using Pydeck."""
     if route_shapes.empty:
