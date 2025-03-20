@@ -147,30 +147,8 @@ if not display_df.empty:
     col1, col2 = st.columns([8, 2])
     with col1:
         st.write("### Vehicle Map")
-        # map_container = st.container()
-        # with map_container:
-        #     map_width = st.get_option("server.maxUploadSize")  # Set width to fit the layout
-        m = folium.Map(location=[display_df["lat"].mean(), display_df["lon"].mean()], zoom_start=12, tiles="cartodb positron")
-    
-        # for _, row in display_df.iterrows():
-        #     # Set marker color based on stop status
-        #     if row["status"] == "On Time":
-        #         color = "green"
-        #     elif row["status"] == "Delayed":
-        #         color = "yellow"
-        #     else:
-        #         color = "red"
-            
-        #     marker = folium.Marker(
-        #         location=[row["lat"], row["lon"]],
-        #         popup=f"Vehicle ID: {row['vehicle_id']}",
-        #         icon=folium.Icon(color=color)
-        #     ).add_to(m)
-            
-        #     folium.Marker(
-        #         location=[row["lat"], row["lon"]],
-        #         icon=folium.DivIcon(html=f'<div style="font-size: 12px; font-weight: bold; color: black; background-color: white; padding: 2px; border-radius: 3px;">{row["vehicle_id"]}</div>')
-        #     ).add_to(m)
+        m = folium.Map(location=[display_df["lat"].mean(), display_df["lon"].mean()], zoom_start=12, tiles=st.session_state.map_layer, width=st.columns([1, 8, 1])[1].width, height=500)
+        
         for _, row in display_df.iterrows():
             color = "green" if row["status"] == "On Time" else "yellow" if row["status"] == "Delayed" else "red"
             folium.Marker(
@@ -180,12 +158,14 @@ if not display_df.empty:
                 popup=f"Vehicle ID: {row['vehicle_id']}<br>Stop Sequence: {row['Stop Sequence']}",
                 icon=folium.Icon(color=color)
             ).add_to(m)
-        folium_static(m)
-
+        
+        folium_static(m, width=st.columns([1, 8, 1])[1].width, height=500)
+    
     with col2:
         st.write("### Refresh Info")
         st.write(f"🕒 Last Refreshed: {st.session_state.get('last_refreshed', 'N/A')}")
         st.write(f"⏳ Next Refresh: {st.session_state.get('next_refresh', 'N/A')}")
+
 
 # Detect browser timezone (defaulting to Australia/Brisbane if unknown)
 def get_browser_timezone():
