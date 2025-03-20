@@ -192,6 +192,12 @@ if not display_df.empty:
     
     folium_static(m)
 
+# Add refresh button
+refresh = st.sidebar.button("🔄 Refresh Data")
+
+# Add auto-refresh checkbox
+auto_refresh = st.sidebar.checkbox("Auto-refresh every 30 seconds")
+
 # Add simple auto-refresh
 if auto_refresh:
     st.empty()
