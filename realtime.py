@@ -110,7 +110,10 @@ if "selected_region" not in st.session_state:
     st.session_state.selected_region = "Gold Coast"
 if "selected_route" not in st.session_state:
     st.session_state.selected_route = "777"
-
+if "last_refreshed" not in st.session_state:
+    st.session_state["last_refreshed"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+if "next_refresh" not in st.session_state:
+    st.session_state["next_refresh"] = (datetime.now() + timedelta(seconds=30)).strftime("%Y-%m-%d %H:%M:%S")
 # Fetch vehicle data
 df = get_vehicle_updates()
 
