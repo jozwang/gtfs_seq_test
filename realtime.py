@@ -193,6 +193,7 @@ auto_refresh = st.sidebar.checkbox("Auto-refresh every 30 seconds")
 if auto_refresh:
     time.sleep(30)
     st.session_state["next_refresh"] = (datetime.now(pytz.utc) + timedelta(seconds=30)).astimezone(browser_timezone).strftime("%Y-%m-%d %H:%M:%S %Z")
+    st.session_state["last_refreshed"] = (datetime.now(pytz.utc)).astimezone(browser_timezone).strftime("%Y-%m-%d %H:%M:%S %Z")
     st.rerun()
 
 
