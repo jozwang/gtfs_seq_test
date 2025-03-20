@@ -103,14 +103,27 @@ def get_route_shapes(route_id, direction, trips_df, shapes_df):
 
 def get_route_stops(route_id, direction, trips_df, stop_times_df, stops_df):
     """Retrieve stops for a given route ID and direction."""
+    # Get a representative trip for this route and direction
     trip_ids = trips_df[(trips_df["route_id"] == route_id) & (trips_df["direction_id"] == str(direction))]["trip_id"].unique()
-    stops_in_route = stop_times_df[stop_times_df["trip_id"].isin(trip_ids)]
     
-    # Merge with stops data
-    stops_in_route = stops_in_route.merge(stops_df, on="stop_id", how="left")
-    stops_in_route = stops_in_route.astype({"stop_lat": "float", "stop_lon": "float"})
-
-    return stops_in_route.drop_duplicates(subset=["stop_id"])
+    if len(trip_ids) == 0:
+        return pd.DataFrame()
+    
+    # Take the first trip as representative
+    rep_trip_id = trip_ids[0]
+    
+    # Get stops for this trip with their sequence
+    trip_stops = stop_times_df[stop_times_df["trip_id"] == rep_trip_id].copy()
+    trip_stops = trip_stops.sort_values(by="stop_sequence")
+    
+    # Merge with stops data to get coordinates
+    stops_in_route = trip_stops.merge(stops_df, on="stop_id", how="left")
+    stops_in_route = stops_in_route.astype({"stop_lat": "float", "stop_lon": "float", "stop_sequence": "int"})
+    
+    # Ensure stop_sequence is a string for the text layer
+    stops_in_route["stop_sequence_text"] = stops_in_route["stop_sequence"].astype(str)
+    
+    return stops_in_route
 
 def plot_route_on_map(route_shapes, route_stops, route_color):
     """Plot route path and stops on a map using Pydeck."""
@@ -146,11 +159,11 @@ def plot_route_on_map(route_shapes, route_stops, route_color):
         "TextLayer",
         data=route_stops,
         get_position=["stop_lon", "stop_lat"],
-        get_text="stop_sequence",
+        get_text="stop_sequence_text",  # Use the string version of stop_sequence
         get_size=16,
         get_color=[255, 255, 255],  # White text for contrast
-        get_angle=0,
         get_alignment_baseline="center",
+        get_angle=0,
         pickable=False
     )
     
@@ -164,7 +177,7 @@ def plot_route_on_map(route_shapes, route_stops, route_color):
     st.pydeck_chart(pdk.Deck(
         layers=[line_layer, stop_layer, text_layer],
         initial_view_state=view_state,
-        tooltip={"text": "{stop_name}"}
+        tooltip={"text": "{stop_name} (Stop #{stop_sequence})"}
     ))
 
 def generate_unique_color(route_id):
