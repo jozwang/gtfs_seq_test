@@ -42,7 +42,7 @@ def load_gtfs_data():
     return routes_df, stops_df, trips_df, stop_times_df, shapes_df
 
 def get_route_shapes(route_id, direction, trips_df, shapes_df):
-    """Retrieve shape points for a given route ID and direction."""
+    """Retrieve and structure shape points for a given route ID and direction."""
     trip_shapes = trips_df[(trips_df["route_id"] == route_id) & (trips_df["direction_id"] == str(direction))][["shape_id"]].drop_duplicates()
     shape_ids = trip_shapes["shape_id"].unique()
 
@@ -52,7 +52,17 @@ def get_route_shapes(route_id, direction, trips_df, shapes_df):
     route_shapes = shapes_df[shapes_df["shape_id"].isin(shape_ids)]
     route_shapes = route_shapes.astype({"shape_pt_lat": "float", "shape_pt_lon": "float", "shape_pt_sequence": "int"})
 
-    return route_shapes.sort_values(by=["shape_id", "shape_pt_sequence"])
+    # Sort by shape_id and sequence
+    route_shapes = route_shapes.sort_values(by=["shape_id", "shape_pt_sequence"])
+
+    # Create start-end coordinate pairs for LineLayer
+    route_shapes["next_lat"] = route_shapes["shape_pt_lat"].shift(-1)
+    route_shapes["next_lon"] = route_shapes["shape_pt_lon"].shift(-1)
+    
+    # Remove last row of each shape (no next point to connect)
+    route_shapes = route_shapes.dropna(subset=["next_lat", "next_lon"])
+
+    return route_shapes
 
 def get_route_stops(route_id, direction, trips_df, stop_times_df, stops_df):
     """Retrieve stops for a given route ID and direction."""
@@ -76,7 +86,7 @@ def plot_route_on_map(route_shapes, route_stops, route_color):
         "LineLayer",
         data=route_shapes,
         get_source_position=["shape_pt_lon", "shape_pt_lat"],
-        get_target_position=["shape_pt_lon", "shape_pt_lat"],
+        get_target_position=["next_lon", "next_lat"],
         get_color=route_color,  # Unique color for the route
         get_width=4,
         auto_highlight=True,
