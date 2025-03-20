@@ -182,8 +182,9 @@ if not display_df.empty:
         folium_static(m)
 
     with col2:
-        st.write("### Last Refreshed")
-        st.write(f"🕒 {st.session_state.get('last_refreshed', 'N/A')}")
+        st.write("### Refresh Info")
+        st.write(f"🕒 Last Refreshed: {st.session_state.get('last_refreshed', 'N/A')}")
+        st.write(f"⏳ Next Refresh: {st.session_state.get('next_refresh', 'N/A')}")
 
 # Add auto-refresh checkbox
 import time
