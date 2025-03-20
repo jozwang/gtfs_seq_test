@@ -156,16 +156,7 @@ if not display_df.empty:
                 popup=f"Vehicle ID: {row['vehicle_id']}<br>Stop Sequence: {row['Stop Sequence']}",
                 icon=folium.Icon(color=color)
             ).add_to(m)
-            
-            folium.Marker(
-                location=[row["lat"], row["lon"]],
-                icon=folium.DivIcon(html=f'<div style="font-size: 12px; font-weight: bold; color: black; background-color: white; padding: 2px; border-radius: 3px;">{row["vehicle_id"]} - {row["Stop Sequence"]}</div>')
-                location=[row["lat"], row["lon"]],
-                icon=folium.DivIcon(html=f'<div style="font-size: 12px; font-weight: bold; color: black; background-color: white; padding: 2px; border-radius: 3px;">{row["vehicle_id"]} - {row["Stop Sequence"]}</div>')
-                location=[row["lat"], row["lon"]],
-                popup=f"Vehicle ID: {row['vehicle_id']}<br>Stop Sequence: {row['Stop Sequence']}",
-                icon=folium.Icon(color=color)
-            ).add_to(m)
+
         
         folium_static(m, width=st.columns([1, 8, 1])[1].width, height=500)
     
