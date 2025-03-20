@@ -191,6 +191,11 @@ if not display_df.empty:
         ).add_to(m)
     
     folium_static(m)
+
+# Add simple auto-refresh
+if auto_refresh:
+    st.empty()
+    st.rerun()
         
 # st.set_page_config(layout="wide")
 # st.title("GTFS Realtime Vehicle Fields")
