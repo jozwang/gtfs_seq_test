@@ -131,7 +131,7 @@ display_df = filtered_df[filtered_df["route_name"] == st.session_state.selected_
 
 # Refresh button
 if st.sidebar.button("🔄 Refresh Data"):
-    st.experimental_rerun()
+    st.rerun()
 
 # Display filtered data
 if not display_df.empty:
