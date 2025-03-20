@@ -1,5 +1,3 @@
-
-
 import pandas as pd
 import requests
 import zipfile
@@ -43,9 +41,9 @@ def load_gtfs_data():
 
     return routes_df, stops_df, trips_df, stop_times_df, shapes_df
 
-def get_route_shapes(route_id, trips_df, shapes_df):
-    """Retrieve shape points for a given route ID."""
-    trip_shapes = trips_df[trips_df["route_id"] == route_id][["shape_id"]].drop_duplicates()
+def get_route_shapes(route_id, direction, trips_df, shapes_df):
+    """Retrieve shape points for a given route ID and direction."""
+    trip_shapes = trips_df[(trips_df["route_id"] == route_id) & (trips_df["direction_id"] == str(direction))][["shape_id"]].drop_duplicates()
     shape_ids = trip_shapes["shape_id"].unique()
 
     if len(shape_ids) == 0:
@@ -56,9 +54,9 @@ def get_route_shapes(route_id, trips_df, shapes_df):
 
     return route_shapes.sort_values(by=["shape_id", "shape_pt_sequence"])
 
-def get_route_stops(route_id, trips_df, stop_times_df, stops_df):
-    """Retrieve stops for a given route ID."""
-    trip_ids = trips_df[trips_df["route_id"] == route_id]["trip_id"].unique()
+def get_route_stops(route_id, direction, trips_df, stop_times_df, stops_df):
+    """Retrieve stops for a given route ID and direction."""
+    trip_ids = trips_df[(trips_df["route_id"] == route_id) & (trips_df["direction_id"] == str(direction))]["trip_id"].unique()
     stops_in_route = stop_times_df[stop_times_df["trip_id"].isin(trip_ids)]
     
     # Merge with stops data
@@ -121,17 +119,20 @@ st.title("Public Transport Route Visualisation")
 routes_df, stops_df, trips_df, stop_times_df, shapes_df = load_gtfs_data()
 
 if routes_df is not None and not routes_df.empty:
-    route_options = routes_df[["route_id", "route_short_name"]].dropna()
-    route_selection = st.selectbox("Select a Route", route_options["route_id"], format_func=lambda x: f"Route {x}")
+    # Display routes using route short name
+    routes_df["route_display"] = "Route " + routes_df["route_short_name"] + " (" + routes_df["route_id"] + ")"
+    route_selection = st.selectbox("Select a Route", routes_df["route_id"], format_func=lambda x: routes_df.loc[routes_df["route_id"] == x, "route_display"].values[0])
 
-    if route_selection:
-        route_shapes = get_route_shapes(route_selection, trips_df, shapes_df)
-        route_stops = get_route_stops(route_selection, trips_df, stop_times_df, stops_df)
-        route_color = generate_unique_color(route_selection)
-        
-        plot_route_on_map(route_shapes, route_stops, route_color)
+    if route_selection and trips_df is not None:
+        # Get available directions for the selected route
+        directions = trips_df[trips_df["route_id"] == route_selection]["direction_id"].unique()
+        direction_selection = st.radio("Select Direction", options=directions, format_func=lambda d: "Outbound" if d == "0" else "Inbound")
+
+        if direction_selection is not None:
+            route_shapes = get_route_shapes(route_selection, direction_selection, trips_df, shapes_df)
+            route_stops = get_route_stops(route_selection, direction_selection, trips_df, stop_times_df, stops_df)
+            route_color = generate_unique_color(route_selection)
+
+            plot_route_on_map(route_shapes, route_stops, route_color)
 else:
     st.error("Failed to load GTFS data.")
-
-
-
