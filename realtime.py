@@ -145,7 +145,7 @@ if st.sidebar.button("🔄 Refresh Data"):
 # Colorize Table Rows to Match Map Markers
 def colorize_row(row):
     color = "background-color: green;" if row["status"] == "On Time" else \
-            "background-color: yellow;" if row["status"] == "Delayed" else \
+            "background-color: orange;" if row["status"] == "Delayed" else \
             "background-color: red;"
     return [color] * len(row)
 
@@ -162,7 +162,7 @@ if not display_df.empty:
         m = folium.Map(location=[display_df["lat"].mean(), display_df["lon"].mean()], zoom_start=12, tiles="cartodb positron")
         
         for _, row in display_df.iterrows():
-            color = "green" if row["status"] == "On Time" else "yellow" if row["status"] == "Delayed" else "red"
+            color = "green" if row["status"] == "On Time" else "orange" if row["status"] == "Delayed" else "red"
 
             # folium.CircleMarker(
             #     location=[row["lat"], row["lon"]],
