@@ -173,7 +173,7 @@ if not display_df.empty:
 
     with col2:
         st.write("### Last Refreshed")
-        st.write(f"🕒 {st.session_state.last_refreshed}")
+        st.write(f"🕒 {st.session_state.get('last_refreshed', 'N/A')}")
 
 # Add auto-refresh checkbox
 import time
