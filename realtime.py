@@ -171,12 +171,16 @@ if not display_df.empty:
 
 
 # Add auto-refresh checkbox
+import time
+
 auto_refresh = st.sidebar.checkbox("Auto-refresh every 30 seconds")
-# Add simple auto-refresh
+if auto_refresh:
+    time.sleep(30)
+    st.rerun()
 if auto_refresh:
     st.empty()
     st.rerun()
-        
+
 # st.set_page_config(layout="wide")
 # st.title("GTFS Realtime Vehicle Fields")
 
