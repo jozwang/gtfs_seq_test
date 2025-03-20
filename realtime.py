@@ -1,7 +1,7 @@
 # import requests
 # from google.transit import gtfs_realtime_pb2
 # import pandas as pd
-import streamlit as st
+
 
 # # Define the GTFS-RT feed URL
 # GTFS_RT_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/VehiclePositions/Bus"
@@ -41,7 +41,7 @@ import streamlit as st
 #     except requests.exceptions.RequestException as e:
 #         st.error(f"Error fetching GTFS-RT feed: {e}")
 #         return pd.DataFrame()
-
+import streamlit as st
 import requests
 import pandas as pd
 from google.transit import gtfs_realtime_pb2
@@ -119,6 +119,7 @@ def get_vehicle_updates():
         return vehicles_df
     
     veh_update = vehicles_df.merge(updates_df, on=["trip_id", "route_id"], how="left")
+    veh_update["route_name"] = veh_update["route_id"].str.split("-").str[0]
     return veh_update
 
 # Streamlit App
