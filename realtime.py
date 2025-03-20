@@ -129,12 +129,22 @@ filtered_df = df[df["region"] == st.session_state.selected_region]
 route_options =  ["All Routes"] + sorted(filtered_df["route_name"].unique())
 st.session_state.selected_route = st.sidebar.selectbox("Select a Route", route_options, index=route_options.index(st.session_state.selected_route) if st.session_state.selected_route in route_options else 0)
 
-# # Apply filters
-# display_df = filtered_df[filtered_df["route_name"] == st.session_state.selected_route]
+# # Apply filters (show all routes if "All Routes" is selected)
+# if st.session_state.selected_route == "All Routes":
+#     display_df = filtered_df  # Show all vehicles in the region
+# else:
+#     display_df = filtered_df[filtered_df["route_name"] == st.session_state.selected_route]
 
-# Apply filters (show all routes if "All Routes" is selected)
+# Apply filters
 if st.session_state.selected_route == "All Routes":
     display_df = filtered_df  # Show all vehicles in the region
+    # Show status filter only when "All Routes" is selected
+    status_options = ["All Statuses"] + sorted(display_df["status"].unique())
+    selected_status = st.sidebar.selectbox("Select Status", status_options, index=0)
+
+    # Filter by status if a specific status is selected
+    if selected_status != "All Statuses":
+        display_df = display_df[display_df["status"] == selected_status]
 else:
     display_df = filtered_df[filtered_df["route_name"] == st.session_state.selected_route]
     
