@@ -87,7 +87,7 @@ def get_vehicle_updates():
     def categorize_region(lat, lon):
         if -27.75 <= lat <= -27.0 and 152.75 <= lon <= 153.5:
             return "Brisbane"
-        elif -28.2 <= lat <= -27.80 and 153.2 <= lon <= 153.6:
+        elif -28.2 <= lat <= -27.78 and 153.2 <= lon <= 153.6:
             return "Gold Coast"
         elif -26.9 <= lat <= -26.3 and 152.8 <= lon <= 153.2:
             return "Sunshine Coast"
