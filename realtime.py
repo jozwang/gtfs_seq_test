@@ -112,14 +112,6 @@ if "last_refreshed" not in st.session_state:
 if "next_refresh" not in st.session_state:
     st.session_state["next_refresh"] = "N/A"
 
-# Detect browser timezone (defaulting to Australia/Brisbane if unknown)
-def get_browser_timezone():
-    try:
-        return pytz.timezone(st.experimental_user.get("timezone", "Australia/Brisbane"))
-    except:
-        return pytz.timezone("Australia/Brisbane")
-
-browser_timezone = get_browser_timezone()
 
 # Fetch vehicle data
 df = get_vehicle_updates()
