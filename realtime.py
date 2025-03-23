@@ -126,7 +126,7 @@ st.session_state.selected_region = st.sidebar.selectbox("Select a Region", regio
 
 # Filter routes based on selected region
 filtered_df = df[df["region"] == st.session_state.selected_region]
-# route_options =  ["All Routes"] + sorted(filtered_df["route_name"].unique())
+route_options =  ["All Routes"] + sorted(filtered_df["route_name"].unique())
 # st.session_state.selected_route = st.sidebar.selectbox("Select a Route", route_options, index=route_options.index(st.session_state.selected_route) if st.session_state.selected_route in route_options else 0)
 
 # Route selection
