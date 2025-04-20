@@ -5,3 +5,4 @@ pandas
 shapely
 folium
 streamlit-folium
+supabase-py
