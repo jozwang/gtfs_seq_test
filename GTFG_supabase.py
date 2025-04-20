@@ -8,14 +8,14 @@ import pytz
 import psycopg2
 from psycopg2.extras import execute_values
 
-# PostgreSQL Connection (from Supabase project)
+# --- PostgreSQL Connection ---
 PG_HOST = "eegejlqdgahlmtjniupz.supabase.co"
 PG_PORT = 5432
 PG_DB = "postgres"
 PG_USER = "postgres"
-PG_PASSWORD = "Supa1base!"
+PG_PASSWORD = "Supa1base!"  # Enter your actual DB password here
 
-# GTFS Static Data URL
+# --- GTFS Static Data URL ---
 GTFS_ZIP_URL = "https://www.data.qld.gov.au/dataset/general-transit-feed-specification-gtfs-translink/resource/e43b6b9f-fc2b-4630-a7c9-86dd5483552b/download"
 
 def get_pg_connection():
@@ -62,19 +62,14 @@ def store_to_postgres(table_name, df):
 
     conn = get_pg_connection()
     cursor = conn.cursor()
-
     try:
-        # Drop all existing rows
         cursor.execute(f"DELETE FROM {table_name};")
-
-        # Dynamically build INSERT query
         columns = list(df.columns)
         values = df[columns].values.tolist()
         insert_query = f"INSERT INTO {table_name} ({','.join(columns)}) VALUES %s"
-
         execute_values(cursor, insert_query, values)
         conn.commit()
-        st.success(f"{table_name} successfully updated in PostgreSQL.")
+        st.success(f"{table_name} updated.")
     except Exception as e:
         st.error(f"Failed to update {table_name}: {e}")
         conn.rollback()
@@ -82,7 +77,7 @@ def store_to_postgres(table_name, df):
         cursor.close()
         conn.close()
 
-def load_gtfs_data():
+def load_gtfs_data(force_refresh=False):
     if "last_refresh" not in st.session_state:
         st.session_state.last_refresh = None
 
@@ -90,10 +85,10 @@ def load_gtfs_data():
     now = datetime.now(brisbane_tz)
     refresh_time = datetime.combine(now.date(), time(1, 0), tzinfo=brisbane_tz)
 
-    if st.session_state.last_refresh is None or now > refresh_time and st.session_state.last_refresh < refresh_time:
+    if force_refresh or st.session_state.last_refresh is None or (now > refresh_time and st.session_state.last_refresh < refresh_time):
         zip_obj = download_gtfs()
         if not zip_obj:
-            return None, None, None, None, None
+            return
 
         routes_df = extract_file(zip_obj, "routes.txt")
         stops_df = extract_file(zip_obj, "stops.txt")
@@ -112,7 +107,27 @@ def load_gtfs_data():
         store_to_postgres("gtfs_shapes", shapes_df)
 
         st.session_state.last_refresh = now
-        return routes_df, stops_df, trips_df, stop_times_df, shapes_df
     else:
         st.info("GTFS data already refreshed today.")
-        return None, None, None, None, None
+
+def show_preview_from_postgres(table_name):
+    try:
+        conn = get_pg_connection()
+        df = pd.read_sql(f"SELECT * FROM {table_name} LIMIT 5", conn)
+        conn.close()
+        st.subheader(f"{table_name} (latest 5 rows)")
+        st.dataframe(df)
+    except Exception as e:
+        st.error(f"Error fetching preview from {table_name}: {e}")
+
+# --- Streamlit App ---
+st.title("GTFS Data Loader")
+
+if st.button("Download Now"):
+    load_gtfs_data(force_refresh=True)
+else:
+    load_gtfs_data(force_refresh=False)
+
+# --- Show Latest Preview from DB ---
+for table in ["gtfs_routes", "gtfs_stops", "gtfs_trips", "gtfs_stop_times", "gtfs_shapes"]:
+    show_preview_from_postgres(table)
