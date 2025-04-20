@@ -6,3 +6,4 @@ shapely
 folium
 streamlit-folium
 supabase
+psycopg2-binary
