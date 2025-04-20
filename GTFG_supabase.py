@@ -5,16 +5,28 @@ import io
 import streamlit as st
 from datetime import datetime, time
 import pytz
-from supabase import create_client, Client
+import psycopg2
+from psycopg2.extras import execute_values
 
-# Supabase setup
-SUPABASE_URL = "https://eegejlqdgahlmtjniupz.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlZ2VqbHFkZ2FobG10am5pdXB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ0MjkyMzEsImV4cCI6MjA2MDAwNTIzMX0.5Y1gaR0NzrEA1GdHklQ8eJiYygVjfsmglQRW2CbE3EA"
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-            
+# PostgreSQL Connection (from Supabase project)
+PG_HOST = "eegejlqdgahlmtjniupz.supabase.co"
+PG_PORT = 5432
+PG_DB = "postgres"
+PG_USER = "postgres"
+PG_PASSWORD = "Supa1base!"
 
 # GTFS Static Data URL
 GTFS_ZIP_URL = "https://www.data.qld.gov.au/dataset/general-transit-feed-specification-gtfs-translink/resource/e43b6b9f-fc2b-4630-a7c9-86dd5483552b/download"
+
+def get_pg_connection():
+    return psycopg2.connect(
+        host=PG_HOST,
+        port=PG_PORT,
+        dbname=PG_DB,
+        user=PG_USER,
+        password=PG_PASSWORD,
+        sslmode="require"
+    )
 
 def download_gtfs():
     try:
@@ -44,18 +56,33 @@ def classify_region(lat, lon):
     else:
         return "Other"
 
-def store_to_supabase(table_name, df):
+def store_to_postgres(table_name, df):
+    if df.empty:
+        return
+
+    conn = get_pg_connection()
+    cursor = conn.cursor()
+
     try:
-        supabase.table(table_name).delete().neq('id', 0).execute()  # Clear existing data
-        data = df.to_dict(orient="records")
-        for chunk in [data[i:i+500] for i in range(0, len(data), 500)]:
-            supabase.table(table_name).insert(chunk).execute()
-        st.success(f"{table_name} successfully updated in Supabase.")
+        # Drop all existing rows
+        cursor.execute(f"DELETE FROM {table_name};")
+
+        # Dynamically build INSERT query
+        columns = list(df.columns)
+        values = df[columns].values.tolist()
+        insert_query = f"INSERT INTO {table_name} ({','.join(columns)}) VALUES %s"
+
+        execute_values(cursor, insert_query, values)
+        conn.commit()
+        st.success(f"{table_name} successfully updated in PostgreSQL.")
     except Exception as e:
         st.error(f"Failed to update {table_name}: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
 
 def load_gtfs_data():
-    # Check if refresh is needed
     if "last_refresh" not in st.session_state:
         st.session_state.last_refresh = None
 
@@ -74,17 +101,15 @@ def load_gtfs_data():
         stop_times_df = extract_file(zip_obj, "stop_times.txt")
         shapes_df = extract_file(zip_obj, "shapes.txt")
 
-        # Convert lat/lon to float and classify regions
         stops_df["stop_lat"] = stops_df["stop_lat"].astype(float)
         stops_df["stop_lon"] = stops_df["stop_lon"].astype(float)
         stops_df["region"] = stops_df.apply(lambda row: classify_region(row["stop_lat"], row["stop_lon"]), axis=1)
 
-        # Store to Supabase
-        store_to_supabase("gtfs_routes", routes_df)
-        store_to_supabase("gtfs_stops", stops_df)
-        store_to_supabase("gtfs_trips", trips_df)
-        store_to_supabase("gtfs_stop_times", stop_times_df)
-        store_to_supabase("gtfs_shapes", shapes_df)
+        store_to_postgres("gtfs_routes", routes_df)
+        store_to_postgres("gtfs_stops", stops_df)
+        store_to_postgres("gtfs_trips", trips_df)
+        store_to_postgres("gtfs_stop_times", stop_times_df)
+        store_to_postgres("gtfs_shapes", shapes_df)
 
         st.session_state.last_refresh = now
         return routes_df, stops_df, trips_df, stop_times_df, shapes_df
