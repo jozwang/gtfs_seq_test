@@ -7,3 +7,4 @@ folium
 streamlit-folium
 supabase
 psycopg2-binary
+pytz
