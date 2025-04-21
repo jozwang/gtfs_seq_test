@@ -2,30 +2,29 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import folium_static
-import psycopg2
-from psycopg2.extras import RealDictCursor
+from sqlalchemy import create_engine
 from gtfs_realtime import get_vehicle_updates
 
-# --- Supabase Configuration ---
+# --- Configuration ---
 SUPABASE_URL = st.secrets.get("SUPABASE_URL")
 SEQ_VIEW_NAME = "seq_gtfs_static"
 
-# --- Database Connection ---
-def get_pg_connection():
+# --- Get SQLAlchemy engine ---
+def get_sqlalchemy_engine():
     try:
-        return psycopg2.connect(SUPABASE_URL, connect_timeout=5, cursor_factory=RealDictCursor)
+        return create_engine(SUPABASE_URL)
     except Exception as e:
         st.error(f"Database connection error: {e}")
         return None
 
-# --- Load view data from Supabase ---
+# --- Load GTFS view data from Supabase ---
 @st.cache_data(show_spinner=False)
-def load_seq_gtfs_static_from_supabase():
-    conn = get_pg_connection()
-    if conn is None:
+def load_seq_gtfs_static():
+    engine = get_sqlalchemy_engine()
+    if engine is None:
         return pd.DataFrame()
     try:
-        df = pd.read_sql(f"SELECT * FROM {SEQ_VIEW_NAME}", conn)
+        df = pd.read_sql(f"SELECT * FROM {SEQ_VIEW_NAME}", con=engine)
         df["shape_pt_lat"] = df["shape_pt_lat"].astype(float)
         df["shape_pt_lon"] = df["shape_pt_lon"].astype(float)
         df["shape_pt_sequence"] = df["shape_pt_sequence"].astype(int)
@@ -33,8 +32,6 @@ def load_seq_gtfs_static_from_supabase():
     except Exception as e:
         st.error(f"Failed to load data from {SEQ_VIEW_NAME}: {e}")
         return pd.DataFrame()
-    finally:
-        conn.close()
 
 # --- Get shapes for a route and direction ---
 def get_route_shapes(route_id, direction_id, shapes_df):
@@ -44,7 +41,7 @@ def get_route_shapes(route_id, direction_id, shapes_df):
     ]
     return route_shapes.sort_values(by=["shape_id", "shape_pt_sequence"]) if not route_shapes.empty else pd.DataFrame()
 
-# --- Plot map with vehicles and route shape ---
+# --- Plot map ---
 def plot_map(vehicles_df, route_shapes=None):
     if vehicles_df.empty:
         map_center = [-27.5, 153.0]
@@ -53,7 +50,7 @@ def plot_map(vehicles_df, route_shapes=None):
 
     m = folium.Map(location=map_center, zoom_start=12)
 
-    # Plot vehicles
+    # Vehicle markers
     for _, row in vehicles_df.iterrows():
         color = "green" if row["status"] == "On Time" else "orange" if row["status"] == "Delayed" else "red"
         folium.Marker(
@@ -61,19 +58,18 @@ def plot_map(vehicles_df, route_shapes=None):
             icon=folium.Icon(color=color, icon="bus", prefix="fa"),
             popup=f"Vehicle {row['vehicle_id']} on Route {row['route_id']}"
         ).add_to(m)
-
         folium.Marker(
             location=[row["lat"], row["lon"]],
             icon=folium.DivIcon(html=f'<div style="font-size: 12px; font-weight: bold; color: black;">{row["vehicle_id"]} - stop {row["Stop Sequence"]}</div>')
         ).add_to(m)
 
-    # Plot polylines for route shapes
+    # Route polylines
     if route_shapes is not None and not route_shapes.empty:
         for shape_id, group in route_shapes.groupby("shape_id"):
-            coordinates = group[["shape_pt_lat", "shape_pt_lon"]].values.tolist()
-            if coordinates:
+            coords = group[["shape_pt_lat", "shape_pt_lon"]].values.tolist()
+            if coords:
                 folium.PolyLine(
-                    locations=coordinates,
+                    locations=coords,
                     color="red",
                     weight=3,
                     tooltip=f"Shape {shape_id}"
@@ -81,15 +77,15 @@ def plot_map(vehicles_df, route_shapes=None):
 
     folium_static(m)
 
-# --- App layout ---
+# --- App setup ---
 st.set_page_config(layout="wide")
 st.title("GTFS Realtime Vehicle & Route Viewer")
 
-# Load GTFS shape view and real-time vehicle data
-shapes_view_df = load_seq_gtfs_static_from_supabase()
+# --- Load data ---
+shapes_view_df = load_seq_gtfs_static()
 vehicles_df = get_vehicle_updates()
 
-# --- Session state initialisation ---
+# --- Initialise session state ---
 if "selected_region" not in st.session_state:
     st.session_state.selected_region = "Gold Coast"
 if "selected_route" not in st.session_state:
@@ -98,7 +94,6 @@ if "selected_route" not in st.session_state:
 # --- Sidebar Filters ---
 st.sidebar.title("🚍 Filters")
 
-# Region filter
 region_options = sorted(vehicles_df["region"].unique())
 st.sidebar.selectbox(
     "Select Region",
@@ -107,10 +102,8 @@ st.sidebar.selectbox(
     key="selected_region"
 )
 
-# Filter vehicles by selected region
 filtered_df = vehicles_df[vehicles_df["region"] == st.session_state.selected_region]
 
-# Route filter
 route_options = ["All Routes"] + sorted(filtered_df["route_name"].unique())
 st.sidebar.selectbox(
     "Select Route",
@@ -119,11 +112,10 @@ st.sidebar.selectbox(
     key="selected_route"
 )
 
-# --- Main display logic ---
+# --- Display logic ---
 if st.session_state.selected_route == "All Routes":
     display_df = filtered_df
 
-    # Status filter
     status_options = ["All Statuses"] + sorted(display_df["status"].unique())
     selected_status = st.sidebar.selectbox("Select Status", status_options, index=0)
     if selected_status != "All Statuses":
@@ -138,7 +130,6 @@ else:
         st.warning(f"No vehicles currently active on route {st.session_state.selected_route}")
         plot_map(filtered_vehicles)
     else:
-        # Find directions from shapes view for the selected route
         directions = shapes_view_df[shapes_view_df["route_id"] == route_id]["direction_id"].unique()
         if len(directions) > 0:
             selected_direction = st.sidebar.radio(
@@ -146,8 +137,6 @@ else:
                 options=sorted(directions),
                 format_func=lambda d: "Outbound" if d == "0" else "Inbound"
             )
-
-            # Filter vehicles and get shapes
             filtered_vehicles = filtered_vehicles[filtered_vehicles["direction_id"] == selected_direction]
             route_shapes = get_route_shapes(route_id, selected_direction, shapes_view_df)
             plot_map(filtered_vehicles, route_shapes)
