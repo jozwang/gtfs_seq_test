@@ -6,18 +6,19 @@ from folium.plugins import AntPath
 import requests
 import pandas as pd
 from google.transit import gtfs_realtime_pb2
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 
 # --- Constants ---
 VEHICLE_POSITIONS_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/VehiclePositions/Bus"
 TRIP_UPDATES_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/TripUpdates/Bus"
 BRISBANE_TZ = pytz.timezone('Australia/Brisbane')
+REFRESH_INTERVAL_SECONDS = 30
 
 # Set a wide layout for the app
 st.set_page_config(layout="wide")
 
-# --- Data Fetching & Processing Functions (No changes here) ---
+# --- Data Fetching & Processing Functions ---
 
 def fetch_gtfs_rt(url: str) -> bytes | None:
     """Fetch GTFS-RT data from a given URL with error handling."""
@@ -75,20 +76,23 @@ def parse_trip_updates(content: bytes) -> pd.DataFrame:
                 })
     return pd.DataFrame(updates)
 
-@st.cache_data(ttl=60)
-def get_live_bus_data() -> pd.DataFrame:
-    """Fetches, merges, and processes vehicle and trip data."""
+@st.cache_data(ttl=REFRESH_INTERVAL_SECONDS)
+def get_live_bus_data() -> tuple[pd.DataFrame, datetime]:
+    """
+    Fetches, merges, and processes vehicle and trip data.
+    Returns the DataFrame and the time of the data refresh.
+    """
     vehicle_content = fetch_gtfs_rt(VEHICLE_POSITIONS_URL)
     trip_content = fetch_gtfs_rt(TRIP_UPDATES_URL)
 
     if not vehicle_content or not trip_content:
-        return pd.DataFrame()
+        return pd.DataFrame(), datetime.now(BRISBANE_TZ)
 
     vehicles_df = parse_vehicle_positions(vehicle_content)
     updates_df = parse_trip_updates(trip_content)
 
     if vehicles_df.empty:
-        return pd.DataFrame()
+        return pd.DataFrame(), datetime.now(BRISBANE_TZ)
 
     live_data = vehicles_df.merge(updates_df, on="trip_id", how="left")
     live_data["delay"].fillna(0, inplace=True)
@@ -106,14 +110,15 @@ def get_live_bus_data() -> pd.DataFrame:
             return "Other"
     
     live_data["region"] = live_data["lat"].apply(categorize_region)
-    return live_data
+    
+    return live_data, datetime.now(BRISBANE_TZ)
 
 # --- Streamlit App UI ---
 
 st.title("🚌 SEQ Live Bus Tracker")
 
-# Fetch current data and retrieve previous data from session state
-current_df = get_live_bus_data()
+# Fetch current data and the time it was refreshed
+current_df, last_refreshed_time = get_live_bus_data()
 previous_df = st.session_state.get('previous_df', pd.DataFrame())
 
 # Merge current data with previous locations to track movement
@@ -173,8 +178,21 @@ else:
 
 # --- Display stats and map ---
 
-st.metric("Buses Currently Tracked", len(filtered_df))
+# Use columns for a tidy layout of stats
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("Buses Currently Tracked", len(filtered_df))
+with col2:
+    st.metric("Last Refreshed", last_refreshed_time.strftime('%I:%M:%S %p %Z'))
+with col3:
+    next_refresh_time = last_refreshed_time + timedelta(seconds=REFRESH_INTERVAL_SECONDS)
+    st.metric("Next Refresh", next_refresh_time.strftime('%I:%M:%S %p %Z'))
+with col4:
+    current_time = datetime.now(BRISBANE_TZ)
+    st.metric("Current Time", current_time.strftime('%I:%M:%S %p %Z'))
+    st.write(f"Date: {current_time.strftime('%A, %d %B %Y')}")
 
+# --- Map rendering ---
 if not filtered_df.empty:
     map_center = [filtered_df['lat'].mean(), filtered_df['lon'].mean()]
     m = folium.Map(location=map_center, zoom_start=10)
@@ -230,7 +248,7 @@ if not filtered_df.empty:
     folium_static(m, width=1400, height=700)
     
     with st.expander("Show Raw Data"):
-        st.dataframe(filtered_df[['vehicle_id', 'route_name', 'status', 'delay', 'region', 'timestamp']]) # Show cleaner data
+        st.dataframe(filtered_df[['vehicle_id', 'route_name', 'status', 'delay', 'region', 'timestamp']])
 else:
     st.info("No buses match the current filter criteria.")
 
