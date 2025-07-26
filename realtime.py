@@ -18,63 +18,7 @@ REFRESH_INTERVAL_SECONDS = 60
 # Set a wide layout for the app
 st.set_page_config(layout="wide")
 
-# --- Data Fetching & Processing Functions ---
-
-def fetch_gtfs_rt(url: str) -> bytes | None:
-    """Fetch GTFS-RT data from a given URL with error handling."""
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        return response.content
-    except requests.RequestException as e:
-        st.error(f"Couldn't fetch data from the API: {e}")
-        return None
-
-def parse_vehicle_positions(content: bytes) -> pd.DataFrame:
-    """Parses vehicle position data from GTFS-RT protobuf content."""
-    feed = gtfs_realtime_pb2.FeedMessage()
-    feed.ParseFromString(content)
-    
-    vehicles = []
-    for entity in feed.entity:
-        if entity.HasField("vehicle"):
-            v = entity.vehicle
-            vehicles.append({
-                "trip_id": v.trip.trip_id,
-                "route_id": v.trip.route_id,
-                "vehicle_id": v.vehicle.label,
-                "lat": v.position.latitude,
-                "lon": v.position.longitude,
-                "stop_sequence": v.current_stop_sequence,
-                "stop_id": v.stop_id,
-                "current_status": v.current_status,
-                "timestamp": datetime.fromtimestamp(v.timestamp, BRISBANE_TZ).strftime('%Y-%m-%d %H:%M:%S %Z') if v.HasField("timestamp") else "N/A"
-            })
-    return pd.DataFrame(vehicles)
-
-def parse_trip_updates(content: bytes) -> pd.DataFrame:
-    """Parses trip update data from GTFS-RT protobuf content."""
-    feed = gtfs_realtime_pb2.FeedMessage()
-    feed.ParseFromString(content)
-
-    updates = []
-    for entity in feed.entity:
-        if entity.HasField("trip_update"):
-            tu = entity.trip_update
-            if tu.stop_time_update:
-                delay = tu.stop_time_update[0].arrival.delay
-                status = "On Time"
-                if delay > 300:
-                    status = "Delayed"
-                elif delay < -60:
-                    status = "Early"
-                
-                updates.append({
-                    "trip_id": tu.trip.trip_id,
-                    "delay": delay,
-                    "status": status
-                })
-    return pd.DataFrame(updates)
+# --- Data Fetching & Processing Functions (No changes here) ---
 
 @st.cache_data(ttl=REFRESH_INTERVAL_SECONDS)
 def get_live_bus_data() -> tuple[pd.DataFrame, datetime]:
@@ -82,6 +26,7 @@ def get_live_bus_data() -> tuple[pd.DataFrame, datetime]:
     Fetches, merges, and processes vehicle and trip data.
     Returns the DataFrame and the time of the data refresh.
     """
+    # (The rest of this function is unchanged)
     vehicle_content = fetch_gtfs_rt(VEHICLE_POSITIONS_URL)
     trip_content = fetch_gtfs_rt(TRIP_UPDATES_URL)
 
@@ -113,6 +58,60 @@ def get_live_bus_data() -> tuple[pd.DataFrame, datetime]:
     
     return live_data, datetime.now(BRISBANE_TZ)
 
+def fetch_gtfs_rt(url: str) -> bytes | None:
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        return response.content
+    except requests.RequestException as e:
+        st.error(f"Couldn't fetch data from the API: {e}")
+        return None
+
+def parse_vehicle_positions(content: bytes) -> pd.DataFrame:
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feed.ParseFromString(content)
+    
+    vehicles = []
+    for entity in feed.entity:
+        if entity.HasField("vehicle"):
+            v = entity.vehicle
+            vehicles.append({
+                "trip_id": v.trip.trip_id,
+                "route_id": v.trip.route_id,
+                "vehicle_id": v.vehicle.label,
+                "lat": v.position.latitude,
+                "lon": v.position.longitude,
+                "stop_sequence": v.current_stop_sequence,
+                "stop_id": v.stop_id,
+                "current_status": v.current_status,
+                "timestamp": datetime.fromtimestamp(v.timestamp, BRISBANE_TZ).strftime('%Y-%m-%d %H:%M:%S %Z') if v.HasField("timestamp") else "N/A"
+            })
+    return pd.DataFrame(vehicles)
+
+def parse_trip_updates(content: bytes) -> pd.DataFrame:
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feed.ParseFromString(content)
+
+    updates = []
+    for entity in feed.entity:
+        if entity.HasField("trip_update"):
+            tu = entity.trip_update
+            if tu.stop_time_update:
+                delay = tu.stop_time_update[0].arrival.delay
+                status = "On Time"
+                if delay > 300:
+                    status = "Delayed"
+                elif delay < -60:
+                    status = "Early"
+                
+                updates.append({
+                    "trip_id": tu.trip.trip_id,
+                    "delay": delay,
+                    "status": status
+                })
+    return pd.DataFrame(updates)
+
+
 # --- Streamlit App UI ---
 
 st.title("🚌 SEQ Live Bus Tracker")
@@ -138,6 +137,7 @@ if master_df.empty:
     st.stop()
 
 # --- CASCADING FILTERS IN SIDEBAR ---
+# (This section is unchanged)
 with st.sidebar:
     st.header("Filters")
     with st.form("filter_form"):
@@ -170,6 +170,7 @@ with st.sidebar:
         
         submitted = st.form_submit_button("Apply Filters")
 
+
 # Apply final filter from the form's selections
 if selected_vehicle != "All":
     filtered_df = df_after_status[df_after_status["vehicle_id"] == selected_vehicle]
@@ -188,11 +189,47 @@ with col3:
     next_refresh_time = last_refreshed_time + timedelta(seconds=REFRESH_INTERVAL_SECONDS)
     st.metric("Next Refresh", next_refresh_time.strftime('%I:%M:%S %p %Z'))
 with col4:
-    current_time = datetime.now(BRISBANE_TZ)
-    st.metric("Current Time", current_time.strftime('%I:%M:%S %p %Z'))
-    st.write(f"Date: {current_time.strftime('%A, %d %B %Y')}")
+    # --- LIVE CLOCK ---
+    # This section is updated to inject HTML and JS for a live clock
+    current_time_placeholder = st.empty()
+    
+    # Get initial time and timezone string
+    initial_time = datetime.now(BRISBANE_TZ)
+    tz_string = BRISBANE_TZ.zone
+    
+    # Define the HTML and JS for the clock
+    clock_html = f"""
+    <div style="text-align: center;">
+        <p style="font-size: 0.8rem; margin-bottom: 0px; color: rgba(49, 51, 63, 0.6);">Current Time</p>
+        <h1 id="clock" style="font-weight: 600; font-size: 1.75rem; color: rgb(49, 51, 63); letter-spacing: -0.025rem; margin-top: 0px;"></h1>
+        <p style="font-size: 1rem; margin-top: 0.2rem;">{initial_time.strftime('%A, %d %B %Y')}</p>
+    </div>
+    <script>
+    function updateClock() {{
+        const clockElement = document.getElementById('clock');
+        if (clockElement) {{
+            const options = {{
+                timeZone: '{tz_string}',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            }};
+            const timeString = new Date().toLocaleTimeString('en-AU', options);
+            clockElement.innerHTML = timeString;
+        }}
+    }}
+    // Update the clock every second
+    setInterval(updateClock, 1000);
+    // Run it once immediately to avoid initial delay
+    updateClock();
+    </script>
+    """
+    current_time_placeholder.markdown(clock_html, unsafe_allow_html=True)
+
 
 # --- Map rendering ---
+# (This section is unchanged)
 if not filtered_df.empty:
     map_center = [filtered_df['lat'].mean(), filtered_df['lon'].mean()]
     m = folium.Map(location=map_center, zoom_start=10)
@@ -251,6 +288,7 @@ if not filtered_df.empty:
         st.dataframe(filtered_df[['vehicle_id', 'route_name', 'status', 'delay', 'region', 'timestamp']])
 else:
     st.info("No buses match the current filter criteria.")
+
 
 # --- Save current data to session state for the next refresh ---
 st.session_state['previous_df'] = current_df
