@@ -1,212 +1,208 @@
-
 import streamlit as st
 import folium
 from streamlit_folium import folium_static
 import requests
 import pandas as pd
 from google.transit import gtfs_realtime_pb2
-from datetime import datetime, timedelta
-import time
+from datetime import datetime
 import pytz
-from gtfs_realtime import get_vehicle_updates , get_trip_updates
 
+# --- Constants ---
+# Use constants for URLs and other magic values for easy maintenance.
+VEHICLE_POSITIONS_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/VehiclePositions/Bus"
+TRIP_UPDATES_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/TripUpdates/Bus"
+BRISBANE_TZ = pytz.timezone('Australia/Brisbane')
 
-# Streamlit App
+# Set a wide layout for the app
 st.set_page_config(layout="wide")
-st.title("GTFS Realtime Vehicle Fields")
 
-# Cache the last selection
-if "selected_region" not in st.session_state:
-    st.session_state.selected_region = "Gold Coast"
-if "selected_route" not in st.session_state:
-    st.session_state.selected_route = "777"
-if "last_refreshed" not in st.session_state:
-    st.session_state["last_refreshed"] = "N/A"
-if "next_refresh" not in st.session_state:
-    st.session_state["next_refresh"] = "N/A"
+# --- Data Fetching Functions ---
 
+def fetch_gtfs_rt(url: str) -> bytes | None:
+    """Fetch GTFS-RT data from a given URL with error handling."""
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()  # Raises an HTTPError for bad responses (4xx or 5xx)
+        return response.content
+    except requests.RequestException as e:
+        st.error(f"Couldn't fetch data from the API: {e}")
+        return None
 
-# Fetch vehicle data
-df = get_vehicle_updates()
-
-# Put all filters in a form in the sidebar
-with st.sidebar.form(key="filter_form"):
-    st.header("🚍 Filter Options")
+def parse_vehicle_positions(content: bytes) -> pd.DataFrame:
+    """Parses vehicle position data from GTFS-RT protobuf content."""
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feed.ParseFromString(content)
     
-    # Filter by Region
-    region_options = ["All"] + list(df['region'].unique())
-    selected_region = st.selectbox("Region", options=region_options)
+    vehicles = []
+    for entity in feed.entity:
+        if entity.HasField("vehicle"):
+            v = entity.vehicle
+            vehicles.append({
+                "trip_id": v.trip.trip_id,
+                "route_id": v.trip.route_id,
+                "vehicle_id": v.vehicle.label,
+                "lat": v.position.latitude,
+                "lon": v.position.longitude,
+                "stop_sequence": v.current_stop_sequence,
+                "stop_id": v.stop_id,
+                "current_status": v.current_status,
+                "timestamp": datetime.fromtimestamp(v.timestamp, BRISBANE_TZ).strftime('%Y-%m-%d %H:%M:%S %Z') if v.HasField("timestamp") else "N/A"
+            })
+    return pd.DataFrame(vehicles)
 
-    # Filter by Route
-    route_options = ["All"] + list(df['route_name'].sort_values().unique())
-    selected_routes = st.multiselect("Route Name", options=route_options, default="All")
+def parse_trip_updates(content: bytes) -> pd.DataFrame:
+    """Parses trip update data from GTFS-RT protobuf content."""
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feed.ParseFromString(content)
 
-    # The button that triggers the rerun
-    submit_button = st.form_submit_button(label="Apply Filters")
+    updates = []
+    for entity in feed.entity:
+        if entity.HasField("trip_update"):
+            tu = entity.trip_update
+            # IMPROVEMENT: Check if stop_time_update list is not empty before accessing index 0
+            if tu.stop_time_update:
+                delay = tu.stop_time_update[0].arrival.delay
+                status = "On Time"
+                if delay > 300:
+                    status = "Delayed"
+                elif delay < -60:
+                    status = "Early"
+                
+                updates.append({
+                    "trip_id": tu.trip.trip_id,
+                    "delay": delay,
+                    "status": status
+                })
+    return pd.DataFrame(updates)
 
-# --- Apply filters AFTER the form is submitted ---
-filtered_df = df.copy() # Start with the full dataset
+# --- Main Data Processing ---
+
+# IMPROVEMENT: Use st.cache_data to cache the data for 60 seconds.
+# This prevents re-fetching on every filter change and handles auto-refresh.
+@st.cache_data(ttl=60)
+def get_live_bus_data() -> pd.DataFrame:
+    """
+    Fetches, merges, and processes vehicle and trip data.
+    The result of this function is cached to improve performance.
+    """
+    vehicle_content = fetch_gtfs_rt(VEHICLE_POSITIONS_URL)
+    trip_content = fetch_gtfs_rt(TRIP_UPDATES_URL)
+
+    if not vehicle_content or not trip_content:
+        return pd.DataFrame()
+
+    vehicles_df = parse_vehicle_positions(vehicle_content)
+    updates_df = parse_trip_updates(trip_content)
+
+    if vehicles_df.empty:
+        return pd.DataFrame()
+
+    # Merge dataframes
+    live_data = vehicles_df.merge(updates_df, on="trip_id", how="left")
+    
+    # Fill NaN values for cleaner data
+    live_data["delay"].fillna(0, inplace=True)
+    live_data["status"].fillna("On Time", inplace=True)
+
+    # Feature Engineering
+    live_data["route_name"] = live_data["route_id"].str.split('-').str[0]
+    
+    # Simple region categorization
+    def categorize_region(lat):
+        if -27.75 <= lat <= -27.0:
+            return "Brisbane"
+        elif -28.2 <= lat <= -27.78:
+            return "Gold Coast"
+        elif -26.9 <= lat <= -26.3:
+            return "Sunshine Coast"
+        else:
+            return "Other"
+    
+    live_data["region"] = live_data["lat"].apply(categorize_region)
+    
+    return live_data
+
+# --- Streamlit App UI ---
+
+st.title("🚌 SEQ Live Bus Tracker")
+
+# Fetch the data (will use cache if available)
+master_df = get_live_bus_data()
+
+if master_df.empty:
+    st.warning("Could not retrieve live bus data. Please try again later.")
+    st.stop() # Stop the script if no data is available
+
+# IMPROVEMENT: Use a sidebar and a form for a better filter experience.
+with st.sidebar:
+    st.header("Filters")
+    with st.form("filter_form"):
+        # Filter widgets
+        selected_region = st.selectbox(
+            "Select Region",
+            options=["All"] + sorted(master_df["region"].unique().tolist())
+        )
+        
+        selected_route = st.selectbox(
+            "Select Route Name",
+            options=["All"] + sorted(master_df["route_name"].unique().tolist())
+        )
+        
+        selected_status = st.multiselect(
+            "Select Status",
+            options=sorted(master_df["status"].unique().tolist()),
+            default=sorted(master_df["status"].unique().tolist())
+        )
+        
+        # The 'Apply Filters' button
+        submitted = st.form_submit_button("Apply Filters")
+
+
+# Apply filters only after the form is submitted
+filtered_df = master_df.copy() # Start with the full dataset
 
 if selected_region != "All":
-    filtered_df = filtered_df[filtered_df['region'] == selected_region]
+    filtered_df = filtered_df[filtered_df["region"] == selected_region]
 
-if "All" not in selected_routes and selected_routes:
-    filtered_df = filtered_df[filtered_df['route_name'].isin(selected_routes)]
+if selected_route != "All":
+    filtered_df = filtered_df[filtered_df["route_name"] == selected_route]
 
-# Now, use `filtered_df` to display your map and data
-st.map(filtered_df)
-st.dataframe(filtered_df)
+if selected_status:
+    filtered_df = filtered_df[filtered_df["status"].isin(selected_status)]
 
-# Refresh button
-if st.sidebar.button("🔄 Refresh Data"):
-    st.rerun()
 
-# # Display filtered data
-# if not display_df.empty:
-#     st.dataframe(display_df)
-# else:
-#     st.write("No vehicle data available.")
+# Display stats and map
+st.metric("Buses Currently Tracked", len(filtered_df))
 
-# Colorize Table Rows to Match Map Markers
-def colorize_row(row):
-    color = "background-color: green;" if row["status"] == "On Time" else \
-            "background-color: orange;" if row["status"] == "Delayed" else \
-            "background-color: red;"
-    return [color] * len(row)
+# Create Folium Map
+if not filtered_df.empty:
+    map_center = [filtered_df['lat'].mean(), filtered_df['lon'].mean()]
+    m = folium.Map(location=map_center, zoom_start=10)
 
-if not display_df.empty:
-    styled_df = display_df.style.apply(colorize_row, axis=1)
-    st.write("### Vehicle Data Table")
-    st.dataframe(styled_df)
+    for _, row in filtered_df.iterrows():
+        popup_html = f"""
+        <b>Route:</b> {row['route_name']} ({row['route_id']})<br>
+        <b>Vehicle ID:</b> {row['vehicle_id']}<br>
+        <b>Status:</b> {row['status']}<br>
+        <b>Delay:</b> {int(row['delay'])} seconds<br>
+        <b>Last Update:</b> {row['timestamp']}
+        """
+        
+        color = "green"
+        if row['status'] == 'Delayed':
+            color = "red"
+        elif row['status'] == 'Early':
+            color = "blue"
+            
+        folium.Marker(
+            [row['lat'], row['lon']],
+            popup=folium.Popup(popup_html, max_width=300),
+            icon=folium.Icon(color=color, icon="bus", prefix="fa")
+        ).add_to(m)
+        
+    folium_static(m, width=1400, height=700)
     
-# Display map if there are filtered results
-if not display_df.empty:
-    col1, col2 = st.columns([8, 2])
-    with col1:
-        st.write("### Vehicle on a Map")
-        m = folium.Map(location=[display_df["lat"].mean(), display_df["lon"].mean()], zoom_start=12, tiles="cartodb positron")
-        
-        for _, row in display_df.iterrows():
-            color = "green" if row["status"] == "On Time" else "orange" if row["status"] == "Delayed" else "red"
-
-            # folium.CircleMarker(
-            #     location=[row["lat"], row["lon"]],
-            #     radius=10,
-            #     color=color,
-            #     fill=True,
-            #     fill_color=color,
-            #     fill_opacity=0.9,
-            # ).add_to(m)
-
-            folium.Marker(
-            location=[row["lat"], row["lon"]],
-            icon=folium.Icon(icon="bus", prefix="fa",color=color)
-            
-           ).add_to(m)
-            
-            folium.Marker(
-                location=[row["lat"], row["lon"]],
-                icon=folium.DivIcon(html=f'<div style="font-size: 12px; font-weight: bold; color: black; text-align: center;">{row["vehicle_id"]}-{f"At stop:{row['Stop Sequence']}"}</div>')
-            ).add_to(m)
-            
-            # folium.Marker(
-            #     location=[row["lat"] - 0.0002, row["lon"]],
-            #     icon=folium.DivIcon(html=f'<div style="font-size: 12px; font-weight: bold; color: black; padding: 2px; border-radius: 6px;"> {f"At stop-{row['Stop Sequence']}"}</div>')
-            # ).add_to(m)
-        
-        folium_static(m)
-    
-    with col2:
-        st.write("### Refresh Info")
-        st.write(f"🕒 Last Refreshed: {st.session_state.get('last_refreshed', 'N/A')}")
-        st.write(f"⏳ Next Refresh: {st.session_state.get('next_refresh', 'N/A')}")
-
-
-# Detect browser timezone (defaulting to Australia/Brisbane if unknown)
-def get_browser_timezone():
-    try:
-        import tzlocal
-        local_timezone = tzlocal.get_localzone()
-        return pytz.timezone(str(local_timezone))
-    except Exception:
-        return pytz.timezone("Australia/Brisbane")
-browser_timezone =get_browser_timezone() 
-# pytz.timezone("Australia/Brisbane")
-
-# Auto-refresh
-auto_refresh = st.sidebar.checkbox("Auto-refresh every 30 seconds")
-if auto_refresh:
-    time.sleep(30)
-    st.session_state["next_refresh"] = (datetime.now(pytz.utc) + timedelta(seconds=30)).astimezone(browser_timezone).strftime("%Y-%m-%d %H:%M:%S %Z")
-    st.session_state["last_refreshed"] = (datetime.now(pytz.utc)).astimezone(browser_timezone).strftime("%Y-%m-%d %H:%M:%S %Z")
-    st.rerun()
-
-
-# st.set_page_config(layout="wide")
-# st.title("GTFS Realtime Vehicle Fields")
-
-# # Fetch data and display as table
-# # df = fetch_vehicle_fields(GTFS_RT_URL)
-# df=get_vehicle_updates() 
-# if not df.empty:
-#     st.dataframe(df)
-# else:
-#     st.write("No vehicle data available.")
-
-
-# id: "VU-9F10C7088E8F64E70D53AB5059107979_1"
-# vehicle {
-#   trip {
-#     trip_id: "31460054-WBS 24_25-38247"
-#     route_id: "526-4010"
-#   }
-#   position {
-#     latitude: -27.6113338
-#     longitude: 152.865952
-#   }
-#   current_stop_sequence: 5
-#   current_status: IN_TRANSIT_TO
-#   timestamp: 1742286803
-#   stop_id: "310421"
-#   vehicle {
-#     id: "9F10C7088E8F64E70D53AB5059107979_1"
-#     label: "1"
-#   }
-# }
-
-# import requests
-# from google.transit import gtfs_realtime_pb2
-# import streamlit as st
-
-# # Define the GTFS-RT feed URL
-# GTFS_RT_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/VehiclePositions/Bus"
-
-# def fetch_all_entities(url):
-#     """Fetch GTFS-RT data and display all entity details as text."""
-#     try:
-#         response = requests.get(url)
-#         response.raise_for_status()  # Ensure request was successful
-        
-#         feed = gtfs_realtime_pb2.FeedMessage()
-#         feed.ParseFromString(response.content)
-        
-#         # Extract all entity data
-#         entity_texts = []
-#         for entity in feed.entity:
-#             entity_texts.append(str(entity))
-        
-#         return "\n\n".join(entity_texts)
-#     except requests.exceptions.RequestException as e:
-#         st.error(f"Error fetching GTFS-RT feed: {e}")
-#         return ""
-
-# # Streamlit App
-# st.title("GTFS Realtime Feed Entities")
-
-# # Fetch and display all data as text
-# entities_text = fetch_all_entities(GTFS_RT_URL)
-# if entities_text:
-#     st.text_area("GTFS-RT Entity Data", entities_text, height=600)
-# else:
-#     st.write("No entity data available.")
-
+    with st.expander("Show Raw Data"):
+        st.dataframe(filtered_df)
+else:
+    st.info("No buses match the current filter criteria.")
