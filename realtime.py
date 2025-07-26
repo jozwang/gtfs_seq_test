@@ -267,7 +267,7 @@ with col4:
 # --- Map rendering ---
 if not filtered_df.empty:
     map_center = [filtered_df['lat'].mean(), filtered_df['lon'].mean()]
-    m = folium.Map(location=map_center, zoom_start=10)
+    m = folium.Map(location=map_center, zoom_start=12)
 
     for _, row in filtered_df.iterrows():
         # --- Draw the animated path for buses that have moved ---
