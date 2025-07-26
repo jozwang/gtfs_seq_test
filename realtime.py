@@ -15,7 +15,7 @@ from streamlit_autorefresh import st_autorefresh
 VEHICLE_POSITIONS_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/VehiclePositions/Bus"
 TRIP_UPDATES_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/TripUpdates/Bus"
 BRISBANE_TZ = pytz.timezone('Australia/Brisbane')
-REFRESH_INTERVAL_SECONDS = 60
+REFRESH_INTERVAL_SECONDS = 30
 
 # Set a wide layout for the app
 st.set_page_config(layout="wide")
