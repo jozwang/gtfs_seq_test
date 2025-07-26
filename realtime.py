@@ -1,5 +1,6 @@
 import streamlit as st
 import folium
+from folium.features import DivIcon
 from streamlit_folium import folium_static
 import requests
 import pandas as pd
@@ -174,12 +175,22 @@ if selected_status:
 # Display stats and map
 st.metric("Buses Currently Tracked", len(filtered_df))
 
-# Create Folium Map
+# --- Create Folium Map ---
+# This section is updated to include custom labels next to the bus icons.
+
 if not filtered_df.empty:
     map_center = [filtered_df['lat'].mean(), filtered_df['lon'].mean()]
     m = folium.Map(location=map_center, zoom_start=10)
 
     for _, row in filtered_df.iterrows():
+        # Determine the color based on status
+        color = "green"
+        if row['status'] == 'Delayed':
+            color = "red"
+        elif row['status'] == 'Early':
+            color = "blue"
+
+        # --- 1. Add the main bus icon with its popup ---
         popup_html = f"""
         <b>Route:</b> {row['route_name']} ({row['route_id']})<br>
         <b>Vehicle ID:</b> {row['vehicle_id']}<br>
@@ -187,17 +198,39 @@ if not filtered_df.empty:
         <b>Delay:</b> {int(row['delay'])} seconds<br>
         <b>Last Update:</b> {row['timestamp']}
         """
-        
-        color = "green"
-        if row['status'] == 'Delayed':
-            color = "red"
-        elif row['status'] == 'Early':
-            color = "blue"
-            
         folium.Marker(
             [row['lat'], row['lon']],
             popup=folium.Popup(popup_html, max_width=300),
             icon=folium.Icon(color=color, icon="bus", prefix="fa")
+        ).add_to(m)
+
+        # --- 2. Add the custom text label next to the icon ---
+        label_text = f"vehicle: {row['vehicle_id']} on stop_seq: {row['stop_sequence']}"
+        
+        # Define the custom HTML for our label using DivIcon
+        label_icon = DivIcon(
+            icon_size=(200, 36),
+            icon_anchor=(85, 15), # Anchor point to position the label
+            html=f"""
+            <div style="
+                font-size: 10pt; 
+                font-weight: bold; 
+                color: {color}; 
+                background-color: #f5f5f5;
+                padding: 4px 8px;
+                border: 1px solid {color};
+                border-radius: 5px;
+                box-shadow: 3px 3px 5px rgba(0,0,0,0.3);
+                white-space: nowrap;">
+                {label_text}
+            </div>
+            """
+        )
+        
+        # Add the label as a second, text-only marker at the same location
+        folium.Marker(
+            location=[row['lat'], row['lon']],
+            icon=label_icon
         ).add_to(m)
         
     folium_static(m, width=1400, height=700)
