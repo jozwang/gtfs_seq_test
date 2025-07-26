@@ -8,6 +8,7 @@ import pandas as pd
 from google.transit import gtfs_realtime_pb2
 from datetime import datetime, timedelta
 import pytz
+import streamlit.components.v1 as components
 
 # --- Constants ---
 VEHICLE_POSITIONS_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/VehiclePositions/Bus"
@@ -187,40 +188,77 @@ with col3:
     next_refresh_time = last_refreshed_time + timedelta(seconds=REFRESH_INTERVAL_SECONDS)
     st.metric("Next Refresh", next_refresh_time.strftime('%I:%M:%S %p %Z'))
 with col4:
-    # --- LIVE CLOCK (Corrected Version) ---
+    # --- LIVE CLOCK (using st.components.v1.html) ---
     initial_time = datetime.now(BRISBANE_TZ)
     tz_string = BRISBANE_TZ.zone
 
-    # Define the HTML and JS for the clock
     clock_html = f"""
-    <div style="text-align: center;">
-        <p style="font-size: 0.8rem; margin-bottom: 0px; color: rgba(49, 51, 63, 0.6);">Current Time</p>
-        <h1 id="clock" style="font-weight: 600; font-size: 1.75rem; color: rgb(49, 51, 63); letter-spacing: -0.025rem; margin-top: 0px;">
-            {initial_time.strftime('%I:%M:%S %p')}
-        </h1>
-        <p style="font-size: 1rem; margin-top: 0.2rem;">{initial_time.strftime('%A, %d %B %Y')}</p>
-    </div>
-    <script>
-    function updateClock() {{
-        const clockElement = document.getElementById('clock');
-        if (clockElement) {{
-            const options = {{
-                timeZone: '{tz_string}',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: true
-            }};
-            const timeString = new Date().toLocaleTimeString('en-AU', options);
-            clockElement.innerHTML = timeString;
+    <head>
+    <style>
+        /* Define styles to match Streamlit's look and feel */
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
         }}
-    }}
-    // Update the clock every second
-    setInterval(updateClock, 1000);
-    </script>
-    """
-    st.markdown(clock_html, unsafe_allow_html=True)
+        .clock-container {{
+            text-align: center;
+            padding-top: 12px;
+        }}
+        .clock-label {{
+            font-size: 0.8rem; 
+            margin-bottom: 0px; 
+            color: rgba(49, 51, 63, 0.6);
+        }}
+        .clock-time {{
+            font-weight: 600; 
+            font-size: 1.75rem; 
+            color: rgb(49, 51, 63); 
+            letter-spacing: -0.025rem; 
+            margin-top: 0px;
+            padding-top: 0px;
+        }}
+        .clock-date {{
+            font-size: 1rem; 
+            margin-top: 0.2rem;
+            color: rgb(49, 51, 63);
+        }}
+    </style>
+    </head>
+    <body>
+        <div class="clock-container">
+            <p class="clock-label">Current Time</p>
+            <h1 id="clock" class="clock-time">{initial_time.strftime('%I:%M:%S %p')}</h1>
+            <p class="clock-date">{initial_time.strftime('%A, %d %B %Y')}</p>
+        </div>
 
+        <script>
+            // Function to update the clock
+            function updateClock() {{
+                const clockElement = document.getElementById('clock');
+                if (clockElement) {{
+                    const options = {{
+                        timeZone: '{tz_string}',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: true
+                    }};
+                    const timeString = new Date().toLocaleTimeString('en-AU', options);
+                    clockElement.innerHTML = timeString;
+                }}
+            }}
+            
+            // Prevent duplicate intervals
+            if (window.clockIntervalId) {{
+                clearInterval(window.clockIntervalId);
+            }}
+
+            // Set the interval to update the clock every second
+            window.clockIntervalId = setInterval(updateClock, 1000);
+        </script>
+    </body>
+    """
+    
+    components.html(clock_html, height=130)
 
 # --- Map rendering ---
 if not filtered_df.empty:
