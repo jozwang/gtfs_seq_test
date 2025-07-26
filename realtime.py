@@ -192,7 +192,8 @@ with col3:
     next_refresh_time = last_refreshed_time + timedelta(seconds=REFRESH_INTERVAL_SECONDS)
     st.metric("Next Refresh", next_refresh_time.strftime('%I:%M:%S %p %Z'))
 with col4:
-    # --- LIVE CLOCK (using st.components.v1.html) ---
+    # --- LIVE CLOCK (Aligned Version) ---
+    # This version removes the date from the component to match the height of st.metric
     initial_time = datetime.now(BRISBANE_TZ)
     tz_string = BRISBANE_TZ.zone
 
@@ -202,28 +203,25 @@ with col4:
         /* Define styles to match Streamlit's look and feel */
         body {{
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            margin: 0;
+            padding: 0;
         }}
         .clock-container {{
             text-align: center;
-            padding-top: 12px;
+            padding-top: 12px; /* Added padding to vertically center with st.metric */
         }}
         .clock-label {{
-            font-size: 0.8rem; 
-            margin-bottom: 0px; 
+            font-size: 0.8rem;
+            margin-bottom: 0px;
             color: rgba(49, 51, 63, 0.6);
         }}
         .clock-time {{
-            font-weight: 600; 
-            font-size: 1.75rem; 
-            color: rgb(49, 51, 63); 
-            letter-spacing: -0.025rem; 
+            font-weight: 600;
+            font-size: 1.75rem;
+            color: rgb(49, 51, 63);
+            letter-spacing: -0.025rem;
             margin-top: 0px;
             padding-top: 0px;
-        }}
-        .clock-date {{
-            font-size: 1rem; 
-            margin-top: 0.2rem;
-            color: rgb(49, 51, 63);
         }}
     </style>
     </head>
@@ -231,38 +229,30 @@ with col4:
         <div class="clock-container">
             <p class="clock-label">Current Time</p>
             <h1 id="clock" class="clock-time">{initial_time.strftime('%I:%M:%S %p')}</h1>
-            <p class="clock-date">{initial_time.strftime('%A, %d %B %Y')}</p>
         </div>
 
         <script>
-            // Function to update the clock
             function updateClock() {{
                 const clockElement = document.getElementById('clock');
                 if (clockElement) {{
-                    const options = {{
-                        timeZone: '{tz_string}',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: true
-                    }};
+                    const options = {{ timeZone: '{tz_string}', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }};
                     const timeString = new Date().toLocaleTimeString('en-AU', options);
                     clockElement.innerHTML = timeString;
                 }}
             }}
-            
-            // Prevent duplicate intervals
-            if (window.clockIntervalId) {{
-                clearInterval(window.clockIntervalId);
-            }}
-
-            // Set the interval to update the clock every second
+            if (window.clockIntervalId) clearInterval(window.clockIntervalId);
             window.clockIntervalId = setInterval(updateClock, 1000);
         </script>
     </body>
     """
-    
-    components.html(clock_html, height=130)
+    # Use a height that closely matches the default st.metric height
+    components.html(clock_html, height=95)
+
+# Display the date separately, right-aligned under the metrics
+st.markdown(
+    f"<p style='text-align:right; color:grey; font-size:0.9rem;'>{initial_time.strftime('%A, %d %B %Y')}</p>",
+    unsafe_allow_html=True
+)
 
 # --- Map rendering ---
 if not filtered_df.empty:
