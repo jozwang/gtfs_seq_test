@@ -8,19 +8,19 @@ import pandas as pd
 from google.transit import gtfs_realtime_pb2
 from datetime import datetime, timedelta
 import pytz
-import streamlit.components.v1 as components
 from streamlit_autorefresh import st_autorefresh
+import streamlit.components.v1 as components
 
 # --- Constants ---
 VEHICLE_POSITIONS_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/VehiclePositions/Bus"
 TRIP_UPDATES_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/TripUpdates/Bus"
 BRISBANE_TZ = pytz.timezone('Australia/Brisbane')
-REFRESH_INTERVAL_SECONDS = 30
+REFRESH_INTERVAL_SECONDS = 60
 
 # Set a wide layout for the app
 st.set_page_config(layout="wide")
 
-# --- Data Fetching & Processing Functions ---
+# --- Data Fetching & Processing Functions (No changes here) ---
 
 @st.cache_data(ttl=REFRESH_INTERVAL_SECONDS)
 def get_live_bus_data() -> tuple[pd.DataFrame, datetime]:
@@ -112,16 +112,16 @@ def parse_trip_updates(content: bytes) -> pd.DataFrame:
                 })
     return pd.DataFrame(updates)
 
+
 # --- Streamlit App UI ---
 
 st.title("🚌 SEQ Live Bus Tracker")
 
-# Add this line to automatically rerun the script
+# Automatically rerun the script to refresh data
 st_autorefresh(interval=REFRESH_INTERVAL_SECONDS * 1000, key="data_refresher")
 
 # Fetch current data and the time it was refreshed
 current_df, last_refreshed_time = get_live_bus_data()
-
 previous_df = st.session_state.get('previous_df', pd.DataFrame())
 
 # Merge current data with previous locations to track movement
@@ -131,7 +131,6 @@ if not previous_df.empty:
         prev_locations, on='vehicle_id', how='left', suffixes=('', '_prev')
     )
 else:
-    # On first run, there's no previous data
     master_df = current_df
     master_df['lat_prev'] = pd.NA
     master_df['lon_prev'] = pd.NA
@@ -140,45 +139,79 @@ if master_df.empty:
     st.warning("Could not retrieve live bus data. Please try again later.")
     st.stop()
 
+# --- Initialize session state for filters if they don't exist ---
+if 'selected_region' not in st.session_state:
+    st.session_state['selected_region'] = 'Gold Coast'
+if 'selected_route' not in st.session_state:
+    st.session_state['selected_route'] = '700'
+if 'selected_status' not in st.session_state:
+    st.session_state['selected_status'] = master_df['status'].unique().tolist()
+if 'selected_vehicle' not in st.session_state:
+    st.session_state['selected_vehicle'] = 'All'
+
+
 # --- CASCADING FILTERS IN SIDEBAR ---
 with st.sidebar:
     st.header("Filters")
     with st.form("filter_form"):
-        # 1. REGION FILTER (with default)
+        # 1. REGION FILTER
         region_options = ["All"] + sorted(master_df["region"].unique().tolist())
+        # Set index based on session state
         try:
-            default_region_index = region_options.index("Gold Coast")
+            region_index = region_options.index(st.session_state['selected_region'])
         except ValueError:
-            default_region_index = 0
-        selected_region = st.selectbox("Region", region_options, index=default_region_index)
+            region_index = 0 # Default to "All" if saved region not found
+        selected_region = st.selectbox("Region", region_options, index=region_index)
 
-        # 2. ROUTE FILTER (cascades from region)
+        # 2. ROUTE FILTER
         df_after_region = master_df[master_df["region"] == selected_region] if selected_region != "All" else master_df
         route_options = ["All"] + sorted(df_after_region["route_name"].unique().tolist())
+        # Check if saved route is still valid, otherwise reset
+        if st.session_state['selected_route'] not in route_options:
+            st.session_state['selected_route'] = "All"
         try:
-            default_route_index = route_options.index("700")
+            route_index = route_options.index(st.session_state['selected_route'])
         except ValueError:
-            default_route_index = 0
-        selected_route = st.selectbox("Route", route_options, index=default_route_index)
+            route_index = 0
+        selected_route = st.selectbox("Route", route_options, index=route_index)
 
-        # 3. STATUS FILTER (cascades from route)
+        # 3. STATUS FILTER
         df_after_route = df_after_region[df_after_region["route_name"] == selected_route] if selected_route != "All" else df_after_region
         status_options = sorted(df_after_route["status"].unique().tolist())
-        selected_status = st.multiselect("Status", status_options, default=status_options)
+        selected_status = st.multiselect("Status", status_options, default=st.session_state['selected_status'])
 
-        # 4. VEHICLE ID FILTER (cascades from status)
+        # 4. VEHICLE ID FILTER
         df_after_status = df_after_route[df_after_route["status"].isin(selected_status)] if selected_status else df_after_route
         vehicle_options = ["All"] + sorted(df_after_status["vehicle_id"].unique().tolist())
-        selected_vehicle = st.selectbox("Vehicle ID", vehicle_options)
+        if st.session_state['selected_vehicle'] not in vehicle_options:
+            st.session_state['selected_vehicle'] = 'All'
+        try:
+            vehicle_index = vehicle_options.index(st.session_state['selected_vehicle'])
+        except ValueError:
+            vehicle_index = 0
+        selected_vehicle = st.selectbox("Vehicle ID", vehicle_options, index=vehicle_index)
 
         submitted = st.form_submit_button("Apply Filters")
 
+        # If form is submitted, update the session state with new selections
+        if submitted:
+            st.session_state['selected_region'] = selected_region
+            st.session_state['selected_route'] = selected_route
+            st.session_state['selected_status'] = selected_status
+            st.session_state['selected_vehicle'] = selected_vehicle
+            st.rerun() # Rerun to apply selections immediately
 
-# Apply final filter from the form's selections
-if selected_vehicle != "All":
-    filtered_df = df_after_status[df_after_status["vehicle_id"] == selected_vehicle]
-else:
-    filtered_df = df_after_status
+# Use session state values to filter the dataframe
+filtered_df = master_df
+if st.session_state['selected_region'] != "All":
+    filtered_df = filtered_df[filtered_df['region'] == st.session_state['selected_region']]
+if st.session_state['selected_route'] != "All":
+    filtered_df = filtered_df[filtered_df['route_name'] == st.session_state['selected_route']]
+if st.session_state['selected_status']:
+    filtered_df = filtered_df[filtered_df['status'].isin(st.session_state['selected_status'])]
+if st.session_state['selected_vehicle'] != "All":
+    filtered_df = filtered_df[filtered_df['vehicle_id'] == st.session_state['selected_vehicle']]
+
 
 # --- Display stats and map ---
 
@@ -193,36 +226,20 @@ with col3:
     st.metric("Next Refresh", next_refresh_time.strftime('%I:%M:%S %p %Z'))
 with col4:
     # --- LIVE CLOCK (Aligned Version) ---
-    # This version removes the date from the component to match the height of st.metric
     initial_time = datetime.now(BRISBANE_TZ)
     tz_string = BRISBANE_TZ.zone
 
     clock_html = f"""
     <head>
     <style>
-        /* Define styles to match Streamlit's look and feel */
         body {{
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
             margin: 0;
             padding: 0;
         }}
-        .clock-container {{
-            text-align: center;
-            padding-top: 12px; /* Added padding to vertically center with st.metric */
-        }}
-        .clock-label {{
-            font-size: 0.8rem;
-            margin-bottom: 0px;
-            color: rgba(49, 51, 63, 0.6);
-        }}
-        .clock-time {{
-            font-weight: 600;
-            font-size: 1.75rem;
-            color: rgb(49, 51, 63);
-            letter-spacing: -0.025rem;
-            margin-top: 0px;
-            padding-top: 0px;
-        }}
+        .clock-container {{ text-align: center; padding-top: 12px; }}
+        .clock-label {{ font-size: 0.8rem; margin-bottom: 0px; color: rgba(49, 51, 63, 0.6); }}
+        .clock-time {{ font-weight: 600; font-size: 1.75rem; color: rgb(49, 51, 63); letter-spacing: -0.025rem; margin-top: 0px; padding-top: 0px; }}
     </style>
     </head>
     <body>
@@ -230,7 +247,6 @@ with col4:
             <p class="clock-label">Current Time</p>
             <h1 id="clock" class="clock-time">{initial_time.strftime('%I:%M:%S %p')}</h1>
         </div>
-
         <script>
             function updateClock() {{
                 const clockElement = document.getElementById('clock');
@@ -245,14 +261,13 @@ with col4:
         </script>
     </body>
     """
-    # Use a height that closely matches the default st.metric height
     components.html(clock_html, height=95)
 
-# Display the date separately, right-aligned under the metrics
 st.markdown(
     f"<p style='text-align:right; color:grey; font-size:0.9rem;'>{initial_time.strftime('%A, %d %B %Y')}</p>",
     unsafe_allow_html=True
 )
+
 
 # --- Map rendering ---
 if not filtered_df.empty:
