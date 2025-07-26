@@ -9,6 +9,7 @@ from google.transit import gtfs_realtime_pb2
 from datetime import datetime, timedelta
 import pytz
 import streamlit.components.v1 as components
+from streamlit_autorefresh import st_autorefresh
 
 # --- Constants ---
 VEHICLE_POSITIONS_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/VehiclePositions/Bus"
@@ -111,13 +112,16 @@ def parse_trip_updates(content: bytes) -> pd.DataFrame:
                 })
     return pd.DataFrame(updates)
 
-
 # --- Streamlit App UI ---
 
 st.title("🚌 SEQ Live Bus Tracker")
 
+# Add this line to automatically rerun the script
+st_autorefresh(interval=REFRESH_INTERVAL_SECONDS * 1000, key="data_refresher")
+
 # Fetch current data and the time it was refreshed
 current_df, last_refreshed_time = get_live_bus_data()
+
 previous_df = st.session_state.get('previous_df', pd.DataFrame())
 
 # Merge current data with previous locations to track movement
