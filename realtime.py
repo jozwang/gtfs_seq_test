@@ -8,7 +8,7 @@ from google.transit import gtfs_realtime_pb2
 from datetime import datetime, timedelta
 import time
 import pytz
-import get_vehicle_updates from gtfs_realtime
+from gtfs_realtime import get_vehicle_updates 
 
 
 # Streamlit App
