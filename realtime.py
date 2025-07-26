@@ -117,47 +117,34 @@ if "next_refresh" not in st.session_state:
 # Fetch vehicle data
 df = get_vehicle_updates()
 
-# Sidebar filters
-st.sidebar.title("🚍 Select Filters")
-
-# Region selection
-region_options = sorted(df["region"].unique())
-st.session_state.selected_region = st.sidebar.selectbox("Select a Region", region_options, index=region_options.index(st.session_state.selected_region) if st.session_state.selected_region in region_options else 0)
-
-# Filter routes based on selected region
-filtered_df = df[df["region"] == st.session_state.selected_region]
-route_options =  ["All Routes"] + sorted(filtered_df["route_name"].unique())
-# st.session_state.selected_route = st.sidebar.selectbox("Select a Route", route_options, index=route_options.index(st.session_state.selected_route) if st.session_state.selected_route in route_options else 0)
-
-# Route selection
-selected_route = st.sidebar.selectbox(
-    "Select a Route", 
-    route_options, 
-    index=route_options.index(st.session_state.selected_route) if st.session_state.selected_route in route_options else 0
-)
-# Only update session state if the selection actually changed
-if selected_route != st.session_state.selected_route:
-    st.session_state.selected_route = selected_route
-    st.rerun() 
-# # Apply filters (show all routes if "All Routes" is selected)
-# if st.session_state.selected_route == "All Routes":
-#     display_df = filtered_df  # Show all vehicles in the region
-# else:
-#     display_df = filtered_df[filtered_df["route_name"] == st.session_state.selected_route]
-
-# Apply filters
-if st.session_state.selected_route == "All Routes":
-    display_df = filtered_df  # Show all vehicles in the region
-    # Show status filter only when "All Routes" is selected
-    status_options = ["All Statuses"] + sorted(display_df["status"].unique())
-    selected_status = st.sidebar.selectbox("Select Status", status_options, index=0)
-
-    # Filter by status if a specific status is selected
-    if selected_status != "All Statuses":
-        display_df = display_df[display_df["status"] == selected_status]
-else:
-    display_df = filtered_df[filtered_df["route_name"] == st.session_state.selected_route]
+# Put all filters in a form in the sidebar
+with st.sidebar.form(key="filter_form"):
+    st.header("🚍 Filter Options")
     
+    # Filter by Region
+    region_options = ["All"] + list(df['region'].unique())
+    selected_region = st.selectbox("Region", options=region_options)
+
+    # Filter by Route
+    route_options = ["All"] + list(df['route_name'].sort_values().unique())
+    selected_routes = st.multiselect("Route Name", options=route_options, default="All")
+
+    # The button that triggers the rerun
+    submit_button = st.form_submit_button(label="Apply Filters")
+
+# --- Apply filters AFTER the form is submitted ---
+filtered_df = df.copy() # Start with the full dataset
+
+if selected_region != "All":
+    filtered_df = filtered_df[filtered_df['region'] == selected_region]
+
+if "All" not in selected_routes and selected_routes:
+    filtered_df = filtered_df[filtered_df['route_name'].isin(selected_routes)]
+
+# Now, use `filtered_df` to display your map and data
+st.map(filtered_df)
+st.dataframe(filtered_df)
+
 # Refresh button
 if st.sidebar.button("🔄 Refresh Data"):
     st.rerun()
