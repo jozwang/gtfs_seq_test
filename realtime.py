@@ -2,6 +2,7 @@ import streamlit as st
 import folium
 from streamlit_folium import folium_static
 from folium.features import DivIcon
+from folium.plugins import AntPath
 import requests
 import pandas as pd
 from google.transit import gtfs_realtime_pb2
@@ -111,7 +112,21 @@ def get_live_bus_data() -> pd.DataFrame:
 
 st.title("🚌 SEQ Live Bus Tracker")
 
-master_df = get_live_bus_data()
+# Fetch current data and retrieve previous data from session state
+current_df = get_live_bus_data()
+previous_df = st.session_state.get('previous_df', pd.DataFrame())
+
+# Merge current data with previous locations to track movement
+if not previous_df.empty:
+    prev_locations = previous_df[['vehicle_id', 'lat', 'lon']]
+    master_df = current_df.merge(
+        prev_locations, on='vehicle_id', how='left', suffixes=('', '_prev')
+    )
+else:
+    # On first run, there's no previous data
+    master_df = current_df
+    master_df['lat_prev'] = pd.NA
+    master_df['lon_prev'] = pd.NA
 
 if master_df.empty:
     st.warning("Could not retrieve live bus data. Please try again later.")
@@ -165,6 +180,17 @@ if not filtered_df.empty:
     m = folium.Map(location=map_center, zoom_start=10)
 
     for _, row in filtered_df.iterrows():
+        # --- Draw the animated path for buses that have moved ---
+        if pd.notna(row['lat_prev']) and (row['lat'] != row['lat_prev'] or row['lon'] != row['lon_prev']):
+            AntPath(
+                locations=[[row['lat_prev'], row['lon_prev']], [row['lat'], row['lon']]],
+                color="blue",
+                weight=5,
+                delay=800,
+                dash_array=[10, 20]
+            ).add_to(m)
+
+        # --- Draw the bus icon and its label ---
         color = "green"
         if row['status'] == 'Delayed':
             color = "red"
@@ -204,6 +230,9 @@ if not filtered_df.empty:
     folium_static(m, width=1400, height=700)
     
     with st.expander("Show Raw Data"):
-        st.dataframe(filtered_df)
+        st.dataframe(filtered_df[['vehicle_id', 'route_name', 'status', 'delay', 'region', 'timestamp']]) # Show cleaner data
 else:
     st.info("No buses match the current filter criteria.")
+
+# --- Save current data to session state for the next refresh ---
+st.session_state['previous_df'] = current_df
