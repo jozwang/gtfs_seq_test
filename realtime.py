@@ -277,4 +277,11 @@ if not filtered_df.empty:
 
     folium_static(m, width=1400, height=700)
 
-    with st.expander
+    with st.expander("Show Raw Data"):
+        st.dataframe(filtered_df[['vehicle_id', 'route_name', 'status', 'delay', 'region', 'timestamp']])
+else:
+    st.info("No buses match the current filter criteria.")
+
+
+# --- Save current data to session state for the next refresh ---
+st.session_state['previous_df'] = current_df
