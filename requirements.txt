@@ -1,11 +1,13 @@
 streamlit
-requests
 gtfs-realtime-bindings
 pandas
 shapely
-folium
 streamlit-folium
 supabase
 psycopg2-binary
-pytz
 sqlalchemy
+requests
+folium
+streamlit-folium
+pytz
+streamlit-autorefresh
