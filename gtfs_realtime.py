@@ -18,81 +18,67 @@ def fetch_gtfs_rt(url):
         st.error(f"Error fetching GTFS-RT data: {e}")
         return None
 
-def get_realtime_vehicles():
-    """Fetch real-time vehicle positions from GTFS-RT API."""
-    feed = gtfs_realtime_pb2.FeedMessage()
-    content = fetch_gtfs_rt("https://gtfsrt.api.translink.com.au/api/realtime/SEQ/VehiclePositions/Bus")
+# --- CONSTANTS ---
+SEQ_VEHICLE_POSITIONS_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/VehiclePositions/Bus"
+SEQ_TRIP_UPDATES_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/TripUpdates/Bus"
+BRISBANE_TZ = pytz.timezone('Australia/Brisbane')
+
+# Region boundaries defined as a clear structure
+REGION_BOUNDS = {
+    "Brisbane": {"lat": (-27.75, -27.0), "lon": (152.75, 153.5)},
+    "Gold Coast": {"lat": (-28.2, -27.78), "lon": (153.2, 153.6)},
+    "Sunshine Coast": {"lat": (-26.9, -26.3), "lon": (152.8, 153.2)},
+}
+
+
+def _fetch_and_parse_gtfs(url: str) -> gtfs_realtime_pb2.FeedMessage | None:
+    """Helper to fetch and parse GTFS-RT data."""
+    content = fetch_gtfs_rt(url) # Your existing fetch function
     if not content:
+        return None
+    
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feed.ParseFromString(content)
+    return feed
+
+def get_realtime_vehicles() -> pd.DataFrame:
+    """Fetch real-time vehicle positions from GTFS-RT API."""
+    feed = _fetch_and_parse_gtfs(SEQ_VEHICLE_POSITIONS_URL)
+    if not feed:
         return pd.DataFrame()
     
-    feed.ParseFromString(content)
-    vehicles = []
-    # timestamp = datetime.utcnow()
-    
-    for entity in feed.entity:
-        if entity.HasField("vehicle"):
-            vehicle = entity.vehicle
-            vehicles.append({
-                "trip_id": vehicle.trip.trip_id,
-                "route_id": vehicle.trip.route_id,
-                "vehicle_id": vehicle.vehicle.label,
-                "lat": vehicle.position.latitude,
-                "lon": vehicle.position.longitude,
-                "Stop Sequence": vehicle.current_stop_sequence ,
-                "Stop ID": vehicle.stop_id ,
-                "current_status": vehicle.current_status ,
-                "Timestamp": datetime.fromtimestamp(vehicle.timestamp, pytz.timezone('Australia/Brisbane')).strftime('%Y-%m-%d %H:%M:%S %Z') if vehicle.HasField("timestamp") else "Unknown"
-            })
-    
+    vehicles = [
+        {
+            "trip_id": entity.vehicle.trip.trip_id,
+            "route_id": entity.vehicle.trip.route_id,
+            "vehicle_id": entity.vehicle.vehicle.label,
+            "lat": entity.vehicle.position.latitude,
+            "lon": entity.vehicle.position.longitude,
+            "Timestamp": datetime.fromtimestamp(entity.vehicle.timestamp, BRISBANE_TZ).strftime('%Y-%m-%d %H:%M:%S')
+        }
+        for entity in feed.entity if entity.HasField("vehicle")
+    ]
     return pd.DataFrame(vehicles)
 
-def get_trip_updates():
-    """Fetch trip updates (delays, cancellations) from GTFS-RT API."""
-    feed = gtfs_realtime_pb2.FeedMessage()
-    content = fetch_gtfs_rt("https://gtfsrt.api.translink.com.au/api/realtime/SEQ/TripUpdates/Bus")
-    if not content:
-        return pd.DataFrame()
-    
-    feed.ParseFromString(content)
-    updates = []
-    
-    for entity in feed.entity:
-        if entity.HasField("trip_update"):
-            trip_update = entity.trip_update
-            delay = trip_update.stop_time_update[0].arrival.delay if trip_update.stop_time_update else None
-            updates.append({
-                "trip_id": trip_update.trip.trip_id,
-                "route_id": trip_update.trip.route_id,
-                "delay": delay,
-                "status": "Delayed" if delay and delay > 300 else ("Early" if delay and delay < -60 else "On Time")
-            })
-    
-    return pd.DataFrame(updates)
-
-def get_vehicle_updates():
-    """Merge real-time vehicle positions with trip updates, add route_name, and categorize by lat/lon."""
+def get_vehicle_updates() -> pd.DataFrame:
+    """Merge vehicle positions and trip updates, and categorize by region."""
     vehicles_df = get_realtime_vehicles()
     updates_df = get_trip_updates()
-    
+
     if vehicles_df.empty:
-        return updates_df
-    if updates_df.empty:
-        return vehicles_df
-    
+        return pd.DataFrame() # Return empty df to avoid errors downstream
+
+    # Merge data
     veh_update = vehicles_df.merge(updates_df, on=["trip_id", "route_id"], how="left")
     veh_update["route_name"] = veh_update["route_id"].str.split("-").str[0]
     
-    # Categorize by lat/lon
-    def categorize_region(lat, lon):
-        if -27.75 <= lat <= -27.0 and 152.75 <= lon <= 153.5:
-            return "Brisbane"
-        elif -28.2 <= lat <= -27.78 and 153.2 <= lon <= 153.6:
-            return "Gold Coast"
-        elif -26.9 <= lat <= -26.3 and 152.8 <= lon <= 153.2:
-            return "Sunshine Coast"
-        else:
-            return "Other"
+    # --- Efficient Region Categorization ---
+    conditions = [
+        (veh_update["lat"].between(*bounds["lat"]) & veh_update["lon"].between(*bounds["lon"]))
+        for region, bounds in REGION_BOUNDS.items()
+    ]
+    choices = list(REGION_BOUNDS.keys())
     
-    veh_update["region"] = veh_update.apply(lambda row: categorize_region(row["lat"], row["lon"]), axis=1)
+    veh_update["region"] = np.select(conditions, choices, default="Other")
     
     return veh_update
